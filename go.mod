@@ -1,3 +1,3 @@
-module raic2022
+module ai_cup_22
 
 go 1.18
