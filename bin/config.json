@@ -6,13 +6,17 @@
   "players": [
     {
       "Tcp": {
-        "host": null,
-        "port": 31001,
-        "accept_timeout": null,
-        "single_timeout": null,
-        "total_time_limit": null,
-        "token": null,
-        "run": null
+        "port": 31002,
+        "timeout": 1,
+        "accept_timeout": 10,
+        "run": {
+          "working_directory": ".",
+          "run_command": [
+            "raic2022_new",
+            "localhost",
+            "31002"
+          ]
+        }
       }
     }
   ]

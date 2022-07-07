@@ -43,6 +43,13 @@ type Unit struct {
 	ShieldPotions int32
 }
 
+func (u Unit) WeaponIndex() int32 {
+	if u.Weapon == nil {
+		return 0
+	}
+	return *u.Weapon
+}
+
 func NewUnit(id int32, playerId int32, health float64, shield float64, extraLives int32, position Vec2, remainingSpawnTime *float64, velocity Vec2, direction Vec2, aim float64, action *Action, healthRegenerationStartTick int32, weapon *int32, nextShotTick int32, ammo []int32, shieldPotions int32) Unit {
 	return Unit{
 		Id:                          id,
