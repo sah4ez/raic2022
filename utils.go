@@ -25,6 +25,24 @@ func (a ByDistance) Less(i, j int) bool {
 	return distantion(a.cur.Position, a.a[i].Position) < distantion(a.cur.Position, a.a[j].Position)
 }
 
+type ByDistanceLoot struct {
+	cur Unit
+	a   []Loot
+}
+
+func NewByDistanceLoot(cur Unit, a []Loot) ByDistanceLoot {
+	return ByDistanceLoot{
+		cur: cur,
+		a:   a,
+	}
+}
+
+func (a ByDistanceLoot) Len() int      { return len(a.a) }
+func (a ByDistanceLoot) Swap(i, j int) { a.a[i], a.a[j] = a.a[j], a.a[i] }
+func (a ByDistanceLoot) Less(i, j int) bool {
+	return distantion(a.cur.Position, a.a[i].Position) < distantion(a.cur.Position, a.a[j].Position)
+}
+
 func distantion(v1 Vec2, v2 Vec2) float64 {
 	return math.Sqrt(math.Pow(float64(v2.X-v1.X), float64(2)) + math.Pow(float64(v2.Y-v1.Y), float64(2)))
 }

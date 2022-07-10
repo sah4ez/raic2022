@@ -17,6 +17,21 @@ type Loot struct {
 	Item Item
 }
 
+func (l Loot) Weapon() (ItemWeapon, bool) {
+	w, ok := l.Item.(ItemWeapon)
+	return w, ok
+}
+
+func (l Loot) Ammo() (ItemAmmo, bool) {
+	w, ok := l.Item.(ItemAmmo)
+	return w, ok
+}
+
+func (l Loot) Shield() (ItemShieldPotions, bool) {
+	w, ok := l.Item.(ItemShieldPotions)
+	return w, ok
+}
+
 func NewLoot(id int32, position Vec2, item Item) Loot {
 	return Loot{
 		Id:       id,

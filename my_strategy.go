@@ -12,6 +12,7 @@ import (
 var (
 	white          = NewColor(255.0, 255.0, 255.0, 1.0)
 	black          = NewColor(0.0, 0.0, 0.0, 1.0)
+	black05        = NewColor(0.0, 0.0, 0.0, 0.5)
 	red            = NewColor(150.0, 0.0, 0.0, 1.0)
 	red05          = NewColor(150.0, 0.0, 0.0, 0.5)
 	red025         = NewColor(150.0, 0.0, 0.0, 0.25)
@@ -26,7 +27,7 @@ var (
 	rightVec       = Vec2{0, 0.5}
 	mainSize       = 1.0
 	lootSize       = 0.2
-	lineSize       = 2.2
+	lineSize       = 1.0
 	lineAttackSize = 1.0
 	bigLineSize    = 2.2
 	angleWalk      = 1.0
@@ -46,6 +47,9 @@ type MyStrategy struct {
 	prevLoot       map[int32]Loot
 	loot           map[int32]Loot
 
+	lootsW   []Loot
+	lootsA   []Loot
+	lootsS   []Loot
 	aims     []Unit
 	prevAims []Unit
 
@@ -79,6 +83,7 @@ func NewMyStrategy(constants Constants) *MyStrategy {
 }
 
 func (st MyStrategy) Reset() {
+	st.unitOrders = make(map[int32]UnitOrder, 0)
 	st.prevLoot = make(map[int32]Loot)
 	for k, v := range st.loot {
 		st.prevLoot[k] = v
@@ -131,9 +136,9 @@ func (st MyStrategy) getOrder(game Game, debugInterface *DebugInterface) Order {
 	}
 
 	st.LoadUnits(game.Units)
-	// st.LoadLoot()
+	st.LoadLoot()
 	st.DoActionUnit()
-	// st.PrintLootInfo()
+	st.PrintLootInfo()
 
 	return Order{
 		UnitOrders: st.GetOrders(),
@@ -159,47 +164,79 @@ func (st *MyStrategy) LoadUnits(units []Unit) {
 }
 
 func (st *MyStrategy) LoadLoot() {
+	st.loot = make(map[int32]Loot, 0)
+
+	st.lootsW = make([]Loot, 0)
+	st.lootsA = make([]Loot, 0)
+	st.lootsS = make([]Loot, 0)
+
 	for _, u := range st.game.Loot {
 		st.loot[u.Id] = u
+		switch u.Item.(type) {
+		case ItemWeapon:
+			st.lootsW = append(st.lootsW, u)
+		case ItemAmmo:
+			st.lootsA = append(st.lootsA, u)
+		case ItemShieldPotions:
+			st.lootsS = append(st.lootsS, u)
+		}
 	}
 }
 
 func (st *MyStrategy) DoActionUnit() {
 
 	for _, u := range st.units {
-		// var order ActionOrder
-		var cmd UnitOrder
-		vecD := rotate(u.Direction, 0.1)
-		vecV := oneVec
-		vecV = rotate(vecV, 0.1)
-		// vecV := Vec2{u.Velocity.X + 1, u.Velocity.Y + 1}
+		var action ActionOrder
 
-		// if st.aim != nil && len(u.Ammo) > 0 {
-		// cmd = st.Attack(u)
-		// } else {
-		// var vecD Vec2
-		// if u.Direction.IsZero() {
-		// vecD = st.game.Zone.CurrentCenter
-		// } else {
-		// vecD = rotate(u.Direction, angleWalk)
-		// }
-		//
-		// vecV := Vec2{}
-		// vecV := st.game.Zone.CurrentCenter
-		//
-		// if u.Health < 50.0 && u.ShieldPotions > 0 {
-		// aim := NewActionOrderUseShieldPotion()
-		// order = &aim
-		// cmd = st.NewUnitOrder(u, vecV, vecD, &order)
-		// } else if len(st.aims) > 0 {
-		// cmd = st.Attack(u)
-		// } else {
-		// cmd = st.NewUnitOrder(u, vecV, vecD, nil)
-		// }
-		// }
+		vecV := zeroVec
+		vecD := zeroVec
 
-		cmd = st.NewUnitOrder(u, vecV, vecD, nil)
-		st.MoveUnit(u, cmd)
+		if u.Ammo[u.WeaponIndex()] < int32(float64(st.consts.Weapons[u.WeaponIndex()].MaxInventoryAmmo)*0.1) {
+			loot, ok := st.NearestLootAmmo(u)
+
+			if ok && u.Position.Distance(loot.Position) < st.consts.UnitRadius {
+				act := NewActionOrderPickup(loot.Id)
+				action = &act
+				st.MoveUnit(u, st.NewUnitOrder(u, vecV, vecD, &action))
+				return
+			} else if ok {
+				vecV = loot.Position.Minus(u.Position)
+				vecD = loot.Position.Minus(u.Position)
+			}
+		}
+
+		if u.Health < float64(st.consts.UnitHealth/0.5) && u.ShieldPotions > 0 {
+			act := NewActionOrderUseShieldPotion()
+			action = &act
+			st.MoveUnit(u, st.NewUnitOrder(u, vecV, vecD, &action))
+			return
+		}
+
+		aim, ok := st.NearestAim(u)
+
+		prop := st.consts.Weapons[u.WeaponIndex()]
+		if d := u.Position.Distance(aim.Position); ok && d/prop.ProjectileSpeed < prop.ProjectileLifeTime {
+			ur := st.consts.UnitRadius
+			delta := 1.5
+			vecD = aim.Position.Minus(u.Position)
+			vecV = aim.Position.Minus(u.Position)
+			if d <= ur*delta {
+				vecV = vecV.Mult(-1.0)
+				fmt.Println(">>>", vecV)
+			}
+			act := NewActionOrderAim(true)
+			action = &act
+			st.MoveUnit(u, st.NewUnitOrder(u, vecV, vecD, &action))
+			return
+		} else if ok {
+			vecV = aim.Position.Minus(u.Position)
+			vecD = aim.Position.Minus(u.Position)
+		} else {
+			vecV = st.game.Zone.CurrentCenter.Minus(u.Position)
+			vecD = st.game.Zone.CurrentCenter.Minus(u.Position)
+		}
+
+		st.MoveUnit(u, st.NewUnitOrder(u, vecV, vecD, nil))
 	}
 }
 
@@ -224,14 +261,14 @@ func (st *MyStrategy) Attack(u Unit) UnitOrder {
 func (st *MyStrategy) NewUnitOrder(u Unit, v Vec2, d Vec2, a *ActionOrder) UnitOrder {
 
 	uo := NewUnitOrder(v, d, a)
-	if dd := st.debugInterface; dd != nil {
-		dd.AddSegment(
-			u.Position,
-			d,
-			bigLineSize,
-			red,
-		)
-	}
+	// if dd := st.debugInterface; dd != nil {
+	// dd.AddSegment(
+	// u.Position,
+	// d,
+	// bigLineSize,
+	// red,
+	// )
+	// }
 	return uo
 }
 
@@ -305,11 +342,14 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 	info := []string{
 		fmt.Sprintf("   ID: %d", st.game.MyId),
 		fmt.Sprintf(" tick: %d", st.game.CurrentTick),
-		fmt.Sprintf("units: %d", len(st.game.Units)),
-		fmt.Sprintf(" loot: %d", len(st.game.Loot)),
+		fmt.Sprintf("units: %d", len(st.aims)),
+		fmt.Sprintf(" loots: a:%d  w:%d  s:%d", len(st.lootsA), len(st.lootsW), len(st.lootsS)),
 	}
 	for _, u := range st.units {
-		info = append(info, fmt.Sprintf("%.2f : %.2f", u.Position.X, u.Position.Y))
+		info = append(info, fmt.Sprintf("p: %.2f : %.2f", u.Position.X, u.Position.Y))
+		info = append(info, fmt.Sprintf("v: %.2f : %.2f", u.Velocity.X, u.Velocity.Y))
+		info = append(info, fmt.Sprintf("d: %.2f : %.2f", u.Direction.X, u.Direction.Y))
+
 		info = append(info, fmt.Sprintf("%d weapon: %d", u.Id, u.WeaponIndex()))
 		info = append(info, fmt.Sprintf("%d ammo: %d", u.Id, len(u.Ammo)))
 		info = append(info, fmt.Sprintf("%d ns: %d", u.Id, u.NextShotTick))
@@ -317,7 +357,7 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 	}
 	for i, msg := range info {
 		st.debugInterface.AddPlacedText(
-			Vec2{u.Position.X, u.Position.Y + float64(i)*float64(mainSize+2.0)},
+			Vec2{u.Position.X, u.Position.Y + float64(i)*float64(mainSize+1.0)},
 			msg,
 			Vec2{1.0, 1.0},
 			mainSize,
@@ -325,13 +365,14 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 		)
 	}
 	for _, u := range st.units {
-		fmt.Println(
-			">>>>>",
-			u.Position,
-			u.Direction,
-			st.unitOrders[u.Id].TargetDirection,
-			st.unitOrders[u.Id].TargetVelocity,
-		)
+		// fmt.Println(
+		// ">>>>>",
+		// u.Position,
+		// u.Direction,
+		// st.unitOrders[u.Id].TargetDirection,
+		// st.unitOrders[u.Id].TargetVelocity,
+		// u.Velocity,
+		// )
 		// st.debugInterface.AddSegment(
 		// u.Position,
 		// st.unitOrders[u.Id].TargetDirection,
@@ -340,10 +381,16 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 		// )
 		st.debugInterface.AddSegment(
 			u.Position,
-			Vec2{u.Position.X + u.Velocity.X*u.Direction.X, u.Position.Y + u.Velocity.X*u.Direction.Y},
+			Vec2{u.Position.X + u.Velocity.X*u.Direction.X, u.Position.Y + u.Velocity.Y*u.Direction.Y},
 			lineSize,
-			black,
+			black05,
 		)
+		// st.debugInterface.AddSegment(
+		// u.Position,
+		// Vec2{u.Position.X + u.Velocity.X, u.Position.Y + u.Velocity.X},
+		// mainSize,
+		// green,
+		// )
 		// st.debugInterface.AddSegment(
 		// u.Position,
 		// u.Velocity,
@@ -365,7 +412,6 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 			)
 		}
 	}
-
 }
 
 func (st *MyStrategy) finish() {

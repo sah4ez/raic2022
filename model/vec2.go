@@ -3,6 +3,7 @@ package model
 import (
 	"fmt"
 	"io"
+	"math"
 
 	. "ai_cup_22/stream"
 )
@@ -21,6 +22,24 @@ func (v Vec2) IsZero() bool {
 
 func (v Vec2) IsOne() bool {
 	return v.X == 1.0 && v.Y == 1.0
+}
+
+func (v Vec2) Minus(t Vec2) Vec2 {
+	return Vec2{
+		X: v.X - t.X,
+		Y: v.Y - t.Y,
+	}
+}
+
+func (v Vec2) Mult(f float64) Vec2 {
+	return Vec2{
+		X: v.X * f,
+		Y: v.Y * f,
+	}
+}
+
+func (v1 Vec2) Distance(v2 Vec2) float64 {
+	return math.Sqrt(math.Pow(float64(v2.X-v1.X), float64(2)) + math.Pow(float64(v2.Y-v1.Y), float64(2)))
 }
 
 func NewVec2(x float64, y float64) Vec2 {

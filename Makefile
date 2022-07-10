@@ -7,7 +7,7 @@ build:
 	go build -v -o ./bin/raic2022_new
 
 run:
-	pushd ./bin/
+	cd ./bin/
 	./aicup22 --config config_empty.json --log-level info
 
 zip:
