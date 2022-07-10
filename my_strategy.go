@@ -205,24 +205,39 @@ func (st *MyStrategy) DoActionUnit() {
 			}
 		}
 
-		if u.Health < float64(st.consts.UnitHealth/0.5) && u.ShieldPotions > 0 {
-			act := NewActionOrderUseShieldPotion()
-			action = &act
-			st.MoveUnit(u, st.NewUnitOrder(u, vecV, vecD, &action))
-			return
+		if u.Health < float64(st.consts.UnitHealth/0.5) {
+			if u.ShieldPotions > 0 {
+				act := NewActionOrderUseShieldPotion()
+				action = &act
+				st.MoveUnit(u, st.NewUnitOrder(u, vecV, vecD, &action))
+				return
+			} else {
+				loot, ok := st.NearestLootSheild(u)
+				if ok {
+					if ok && u.Position.Distance(loot.Position) < st.consts.UnitRadius {
+						act := NewActionOrderPickup(loot.Id)
+						action = &act
+						st.MoveUnit(u, st.NewUnitOrder(u, vecV, vecD, &action))
+						return
+					} else if ok {
+						vecV = loot.Position.Minus(u.Position)
+						vecD = loot.Position.Minus(u.Position)
+					}
+				}
+			}
 		}
 
 		aim, ok := st.NearestAim(u)
 
 		prop := st.consts.Weapons[u.WeaponIndex()]
-		if d := u.Position.Distance(aim.Position); ok && d/prop.ProjectileSpeed < prop.ProjectileLifeTime {
-			ur := st.consts.UnitRadius
-			delta := 1.5
+		ammoD := prop.ProjectileSpeed / prop.ProjectileLifeTime
+		if d := u.Position.Distance(aim.Position); ok && d < ammoD {
+			delta := 0.9
 			vecD = aim.Position.Minus(u.Position)
 			vecV = aim.Position.Minus(u.Position)
-			if d <= ur*delta {
+			fmt.Println(">>>", vecV, prop.ProjectileSpeed, prop.ProjectileLifeTime, d, ammoD)
+			if d <= ammoD*delta {
 				vecV = vecV.Mult(-1.0)
-				fmt.Println(">>>", vecV)
 			}
 			act := NewActionOrderAim(true)
 			action = &act
@@ -354,6 +369,7 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 		info = append(info, fmt.Sprintf("%d ammo: %d", u.Id, len(u.Ammo)))
 		info = append(info, fmt.Sprintf("%d ns: %d", u.Id, u.NextShotTick))
 		info = append(info, fmt.Sprintf("%d Aim: %.4f", u.Id, u.Aim))
+		info = append(info, fmt.Sprintf("%d Aim: %.4f", u.Id, u.ShieldPotions))
 	}
 	for i, msg := range info {
 		st.debugInterface.AddPlacedText(
