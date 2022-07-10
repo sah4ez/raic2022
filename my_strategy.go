@@ -4,7 +4,6 @@ import (
 	. "ai_cup_22/debugging"
 	. "ai_cup_22/model"
 	"fmt"
-	"math"
 	"sort"
 	"sync"
 )
@@ -28,8 +27,9 @@ var (
 	mainSize       = 1.0
 	lootSize       = 0.2
 	lineSize       = 1.0
+	prSize         = 0.1
 	lineAttackSize = 1.0
-	bigLineSize    = 2.2
+	bigLineSize    = 0.5
 	angleWalk      = 1.0
 )
 
@@ -152,7 +152,7 @@ func (st MyStrategy) getOrder(game Game, debugInterface *DebugInterface) Order {
 func (st *MyStrategy) LoadProjectilse() {
 	st.projectiles = make([]Projectile, 0)
 	for _, u := range st.game.Projectiles {
-		if u.ShooterId == st.me.Id {
+		if _, ok := st.units[u.ShooterId]; ok {
 			continue
 		}
 		st.projectiles = append(st.projectiles, u)
@@ -228,6 +228,8 @@ func (st *MyStrategy) DoActionUnit() {
 			if u.ShieldPotions > 0 {
 				act := NewActionOrderUseShieldPotion()
 				action = &act
+				vecV = st.game.Zone.CurrentCenter.Minus(u.Position)
+				vecD = st.game.Zone.CurrentCenter.Minus(u.Position)
 				st.MoveUnit(u, st.NewUnitOrder(u, vecV, vecD, &action))
 				return
 			} else {
@@ -251,11 +253,14 @@ func (st *MyStrategy) DoActionUnit() {
 		prop := st.consts.Weapons[u.WeaponIndex()]
 		ammoD := prop.ProjectileSpeed / prop.ProjectileLifeTime
 		if d := u.Position.Distance(aim.Position); ok && d < ammoD {
+			// 90% от дистанции выстрела
 			delta := 0.9
 			vecD = aim.Position.Minus(u.Position)
 			vecV = aim.Position.Minus(u.Position)
 			if d <= ammoD*delta {
-				vecV = vecV.Mult(-1.0)
+				// vecV = vecV.Mult(-1.0)
+				// пытаемся сместиться в случае отступления к центру карты
+				vecV = st.game.Zone.CurrentCenter.Minus(u.Position)
 			}
 			act := NewActionOrderAim(true)
 			action = &act
@@ -268,6 +273,7 @@ func (st *MyStrategy) DoActionUnit() {
 			vecV = st.game.Zone.CurrentCenter.Minus(u.Position)
 			vecD = st.game.Zone.CurrentCenter.Minus(u.Position)
 			if u.OnPoint(st.game.Zone.CurrentCenter, st.URadius()) {
+				vecV = zeroVec
 				vecD = rotate(vecD, 5.0)
 			}
 		}
@@ -286,8 +292,7 @@ func (st *MyStrategy) Attack(u Unit) UnitOrder {
 	aim := NewActionOrderAim(u.Aim > 0.1)
 	order = &aim
 
-	angle := math.Atan2(st.aim.Position.Y, st.aim.Position.X) - math.Atan2(u.Position.Y, u.Position.X)
-	vecD := rotate(u.Position, angle)
+	vecD := rotate(u.Position, angle(st.aim.Position, u.Position))
 	// vecD := st.aim.Position
 	vecV := st.aim.Position
 
@@ -337,9 +342,6 @@ func (st *MyStrategy) MoveUnit(u Unit, o UnitOrder) {
 func (st *MyStrategy) debugUpdate(debugInterface DebugInterface) {
 	debugInterface.Clear()
 	defer debugInterface.Flush()
-
-	debugInterface.AddCircle(st.game.Zone.CurrentCenter, 5, red)
-
 }
 
 func (st *MyStrategy) PrintAimsInfo(u Unit, a Unit) {
@@ -379,7 +381,8 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 		fmt.Sprintf("   ID: %d", st.game.MyId),
 		fmt.Sprintf(" tick: %d", st.game.CurrentTick),
 		fmt.Sprintf("units: %d", len(st.aims)),
-		fmt.Sprintf(" loots: a:%d  w:%d  s:%d", len(st.lootsA), len(st.lootsW), len(st.lootsS)),
+		fmt.Sprintf("  prj: %d", len(st.projectiles)),
+		fmt.Sprintf("loots: a:%d  w:%d  s:%d", len(st.lootsA), len(st.lootsW), len(st.lootsS)),
 	}
 	for _, u := range st.units {
 		info = append(info, fmt.Sprintf("p: %.2f : %.2f", u.Position.X, u.Position.Y))
@@ -400,6 +403,31 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 			mainSize,
 			black,
 		)
+	}
+	scale := 0.2
+	greenLine := map[int32]Unit{}
+	for _, u := range st.units {
+		p, ok := st.NearestProj(u)
+		if ok {
+			greenLine[p.Id] = u
+		}
+	}
+	for _, u := range st.projectiles {
+		color := red025
+		p1 := Vec2{u.Position.X - u.Velocity.X*scale, u.Position.Y - u.Velocity.Y*scale}
+		p2 := Vec2{u.Position.X + u.Velocity.X, u.Position.Y + u.Velocity.Y}
+		if uu, ok := greenLine[u.Id]; ok {
+			color = green
+			p1 := Vec2{u.Position.X - u.Velocity.X + 300, u.Position.Y - u.Velocity.Y + 300}
+			p2 := Vec2{u.Position.X + u.Velocity.X + 300, u.Position.Y + u.Velocity.Y + 300}
+			proj := distPointToLine2(uu.Position, p1, p2)
+			fmt.Println(uu.Position, proj, uu.Position.Minus(proj))
+			// if dist <= st.URadius() {
+			st.debugInterface.AddSegment(uu.Position, proj, prSize, color)
+			st.debugInterface.AddCircle(proj, bigLineSize, black)
+			// }
+		}
+		st.debugInterface.AddSegment(p1, p2, prSize, color)
 	}
 	for _, u := range st.units {
 		// fmt.Println(

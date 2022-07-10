@@ -36,3 +36,11 @@ func (st *MyStrategy) NearestAim(u Unit) (Unit, bool) {
 	}
 	return Unit{}, false
 }
+
+func (st *MyStrategy) NearestProj(u Unit) (Projectile, bool) {
+	if len(st.projectiles) > 0 {
+		sort.Sort(NewByDistanceProjectiles(u, st.projectiles))
+		return st.projectiles[0], true
+	}
+	return Projectile{}, false
+}

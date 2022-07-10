@@ -30,6 +30,12 @@ func (v Vec2) Minus(t Vec2) Vec2 {
 		Y: v.Y - t.Y,
 	}
 }
+func (v Vec2) Plus(t Vec2) Vec2 {
+	return Vec2{
+		X: v.X + t.X,
+		Y: v.Y + t.Y,
+	}
+}
 
 func (v Vec2) Mult(f float64) Vec2 {
 	return Vec2{
