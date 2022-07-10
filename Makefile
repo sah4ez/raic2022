@@ -7,7 +7,8 @@ build:
 	go build -v -o ./bin/raic2022_new
 
 run:
-	./bin/aicup22 --config ./config1.json
+	pushd ./bin/
+	./aicup22 --config config_empty.json --log-level info
 
 zip:
 	zip ./bin/my_stratage.zip ./main.go \
