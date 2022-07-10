@@ -43,6 +43,10 @@ type Unit struct {
 	ShieldPotions int32
 }
 
+func (u Unit) OnPoint(p Vec2, radius float64) bool {
+	return u.Position.Distance(p) < radius
+}
+
 func (u Unit) WeaponIndex() int32 {
 	if u.Weapon == nil {
 		return 0

@@ -47,11 +47,12 @@ type MyStrategy struct {
 	prevLoot       map[int32]Loot
 	loot           map[int32]Loot
 
-	lootsW   []Loot
-	lootsA   []Loot
-	lootsS   []Loot
-	aims     []Unit
-	prevAims []Unit
+	projectiles []Projectile
+	lootsW      []Loot
+	lootsA      []Loot
+	lootsS      []Loot
+	aims        []Unit
+	prevAims    []Unit
 
 	haims     map[int32]Unit
 	prevHaims map[int32]Unit
@@ -79,6 +80,8 @@ func NewMyStrategy(constants Constants) *MyStrategy {
 		prevHaims: make(map[int32]Unit),
 
 		once: new(sync.Once),
+
+		projectiles: make([]Projectile, 0),
 	}
 }
 
@@ -136,6 +139,7 @@ func (st MyStrategy) getOrder(game Game, debugInterface *DebugInterface) Order {
 	}
 
 	st.LoadUnits(game.Units)
+	st.LoadProjectilse()
 	st.LoadLoot()
 	st.DoActionUnit()
 	st.PrintLootInfo()
@@ -143,6 +147,17 @@ func (st MyStrategy) getOrder(game Game, debugInterface *DebugInterface) Order {
 	return Order{
 		UnitOrders: st.GetOrders(),
 	}
+}
+
+func (st *MyStrategy) LoadProjectilse() {
+	st.projectiles = make([]Projectile, 0)
+	for _, u := range st.game.Projectiles {
+		if u.ShooterId == st.me.Id {
+			continue
+		}
+		st.projectiles = append(st.projectiles, u)
+	}
+	return
 }
 
 func (st *MyStrategy) LoadUnits(units []Unit) {
@@ -183,6 +198,10 @@ func (st *MyStrategy) LoadLoot() {
 	}
 }
 
+func (st *MyStrategy) URadius() float64 {
+	return st.consts.UnitRadius
+}
+
 func (st *MyStrategy) DoActionUnit() {
 
 	for _, u := range st.units {
@@ -194,7 +213,7 @@ func (st *MyStrategy) DoActionUnit() {
 		if u.Ammo[u.WeaponIndex()] < int32(float64(st.consts.Weapons[u.WeaponIndex()].MaxInventoryAmmo)*0.1) {
 			loot, ok := st.NearestLootAmmo(u)
 
-			if ok && u.Position.Distance(loot.Position) < st.consts.UnitRadius {
+			if ok && u.OnPoint(loot.Position, st.URadius()) {
 				act := NewActionOrderPickup(loot.Id)
 				action = &act
 				st.MoveUnit(u, st.NewUnitOrder(u, vecV, vecD, &action))
@@ -214,7 +233,7 @@ func (st *MyStrategy) DoActionUnit() {
 			} else {
 				loot, ok := st.NearestLootSheild(u)
 				if ok {
-					if ok && u.Position.Distance(loot.Position) < st.consts.UnitRadius {
+					if ok && u.OnPoint(loot.Position, st.URadius()) {
 						act := NewActionOrderPickup(loot.Id)
 						action = &act
 						st.MoveUnit(u, st.NewUnitOrder(u, vecV, vecD, &action))
@@ -235,7 +254,6 @@ func (st *MyStrategy) DoActionUnit() {
 			delta := 0.9
 			vecD = aim.Position.Minus(u.Position)
 			vecV = aim.Position.Minus(u.Position)
-			fmt.Println(">>>", vecV, prop.ProjectileSpeed, prop.ProjectileLifeTime, d, ammoD)
 			if d <= ammoD*delta {
 				vecV = vecV.Mult(-1.0)
 			}
@@ -249,6 +267,9 @@ func (st *MyStrategy) DoActionUnit() {
 		} else {
 			vecV = st.game.Zone.CurrentCenter.Minus(u.Position)
 			vecD = st.game.Zone.CurrentCenter.Minus(u.Position)
+			if u.OnPoint(st.game.Zone.CurrentCenter, st.URadius()) {
+				vecD = rotate(vecD, 5.0)
+			}
 		}
 
 		st.MoveUnit(u, st.NewUnitOrder(u, vecV, vecD, nil))
@@ -369,7 +390,7 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 		info = append(info, fmt.Sprintf("%d ammo: %d", u.Id, len(u.Ammo)))
 		info = append(info, fmt.Sprintf("%d ns: %d", u.Id, u.NextShotTick))
 		info = append(info, fmt.Sprintf("%d Aim: %.4f", u.Id, u.Aim))
-		info = append(info, fmt.Sprintf("%d Aim: %.4f", u.Id, u.ShieldPotions))
+		info = append(info, fmt.Sprintf("%d Sheilds: %d", u.Id, u.ShieldPotions))
 	}
 	for i, msg := range info {
 		st.debugInterface.AddPlacedText(
