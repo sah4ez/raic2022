@@ -15,6 +15,14 @@ type Vec2 struct {
 	Y float64
 }
 
+func (v Vec2) IsZero() bool {
+	return v.X == 0.0 && v.Y == 0.0
+}
+
+func (v Vec2) IsOne() bool {
+	return v.X == 1.0 && v.Y == 1.0
+}
+
 func NewVec2(x float64, y float64) Vec2 {
 	return Vec2{
 		X: x,

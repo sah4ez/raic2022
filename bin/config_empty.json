@@ -1,0 +1,29 @@
+{
+  "seed": null,
+  "game": {
+    "Create": "Round1"
+  },
+      "bot_players_config": [
+        {
+          "Empty": null
+        }
+      ],
+      
+    "players": [
+    {
+      "Tcp": {
+        "port": 31002,
+        "timeout": 1,
+        "accept_timeout": 10,
+        "run": {
+          "working_directory": ".",
+          "run_command": [
+            "raic2022_new",
+            "localhost",
+            "31002"
+          ]
+        }
+      }
+    }
+  ]
+}
