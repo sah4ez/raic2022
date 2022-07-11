@@ -44,3 +44,11 @@ func (st *MyStrategy) NearestProj(u Unit) (Projectile, bool) {
 	}
 	return Projectile{}, false
 }
+
+func (st *MyStrategy) NearestObstacle(u Unit) (Obstacle, bool) {
+	if len(st.consts.Obstacles) > 0 {
+		sort.Sort(NewByDistanceObstacle(u, st.consts.Obstacles))
+		return st.consts.Obstacles[0], true
+	}
+	return Obstacle{}, false
+}

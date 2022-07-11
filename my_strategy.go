@@ -18,6 +18,8 @@ var (
 	green          = NewColor(0.0, 150.0, 0.0, 1.0)
 	green05        = NewColor(0.0, 150.0, 0.0, 0.5)
 	blue           = NewColor(0.0, 0.0, 150.0, 1.0)
+	blue05         = NewColor(0.0, 0.0, 150.0, 0.5)
+	blue25         = NewColor(0.0, 0.0, 150.0, 0.25)
 	zeroVec        = Vec2{0, 0}
 	oneVec         = Vec2{1, 1}
 	twoVec         = Vec2{2, 2}
@@ -31,6 +33,7 @@ var (
 	lineAttackSize = 1.0
 	bigLineSize    = 0.5
 	angleWalk      = 1.0
+	deltaDist      = 0.9
 )
 
 type MyStrategy struct {
@@ -53,6 +56,8 @@ type MyStrategy struct {
 	lootsS      []Loot
 	aims        []Unit
 	prevAims    []Unit
+
+	obstacles []Obstacle
 
 	haims     map[int32]Unit
 	prevHaims map[int32]Unit
@@ -141,12 +146,40 @@ func (st MyStrategy) getOrder(game Game, debugInterface *DebugInterface) Order {
 	st.LoadUnits(game.Units)
 	st.LoadProjectilse()
 	st.LoadLoot()
+	// st.DoTestAction(debugInterface)
 	st.DoActionUnit()
 	st.PrintLootInfo()
 
 	return Order{
 		UnitOrders: st.GetOrders(),
 	}
+}
+
+func (st *MyStrategy) DoTestAction(di *DebugInterface) {
+	for _, u := range st.units {
+		// var action ActionOrder
+
+		vecV := zeroVec
+		vecD := zeroVec
+
+		obs, ok := st.NearestObstacle(u)
+		if d := u.Position.Distance(obs.Position); ok && d > 2*(st.URadius()+obs.Radius) {
+			fmt.Println(">>>>", d)
+			di.AddSegment(u.Position, obs.Position, prSize, black)
+			vecV = obs.Position.Minus(u.Position)
+			vecD = obs.Position.Minus(u.Position)
+		} else {
+			vecV = st.game.Zone.CurrentCenter.Minus(u.Position)
+			vecD = st.game.Zone.CurrentCenter.Minus(u.Position)
+			if u.OnPoint(st.game.Zone.CurrentCenter, st.URadius()) {
+				vecV = zeroVec
+				vecD = rotate(vecD, 5.0)
+			}
+		}
+
+		st.MoveUnit(u, st.NewUnitOrder(u, vecV, vecD, nil))
+	}
+
 }
 
 func (st *MyStrategy) LoadProjectilse() {
@@ -202,6 +235,10 @@ func (st *MyStrategy) URadius() float64 {
 	return st.consts.UnitRadius
 }
 
+func (st *MyStrategy) MaxUVel() float64 {
+	return st.consts.MaxUnitForwardSpeed
+}
+
 func (st *MyStrategy) DoActionUnit() {
 
 	for _, u := range st.units {
@@ -248,29 +285,46 @@ func (st *MyStrategy) DoActionUnit() {
 			}
 		}
 
-		aim, ok := st.NearestAim(u)
+		delta := zeroVec
+		prj, ok := st.NearestProj(u)
+		if ok {
+			p2 := Vec2{prj.Position.X + prj.Velocity.X, prj.Position.Y + prj.Velocity.Y}
+			d := distantion(u.Position, prj.Position)
+			pv := pointOnCircle(d, prj.Position, p2)
+			dv := distantion(pv, u.Position)
+			if dist := dv - st.URadius(); dist < st.URadius() {
+				vec := u.Position.Minus(pv)
+				delta = Vec2{u.Position.X + vec.X*dv, u.Position.Y + vec.X*dv}
+			}
 
+		}
+
+		aim, ok := st.NearestAim(u)
 		prop := st.consts.Weapons[u.WeaponIndex()]
 		ammoD := prop.ProjectileSpeed / prop.ProjectileLifeTime
 		if d := u.Position.Distance(aim.Position); ok && d < ammoD {
 			// 90% от дистанции выстрела
-			delta := 0.9
 			vecD = aim.Position.Minus(u.Position)
 			vecV = aim.Position.Minus(u.Position)
-			if d <= ammoD*delta {
+			if d <= ammoD*deltaDist {
 				// vecV = vecV.Mult(-1.0)
 				// пытаемся сместиться в случае отступления к центру карты
 				vecV = st.game.Zone.CurrentCenter.Minus(u.Position)
 			}
+			vecV = vecV.Plus(delta)
 			act := NewActionOrderAim(true)
 			action = &act
 			st.MoveUnit(u, st.NewUnitOrder(u, vecV, vecD, &action))
 			return
 		} else if ok {
 			vecV = aim.Position.Minus(u.Position)
+			vecV = vecV.Plus(delta)
+
 			vecD = aim.Position.Minus(u.Position)
 		} else {
 			vecV = st.game.Zone.CurrentCenter.Minus(u.Position)
+			vecV = vecV.Plus(delta)
+
 			vecD = st.game.Zone.CurrentCenter.Minus(u.Position)
 			if u.OnPoint(st.game.Zone.CurrentCenter, st.URadius()) {
 				vecV = zeroVec
@@ -394,7 +448,16 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 		info = append(info, fmt.Sprintf("%d ns: %d", u.Id, u.NextShotTick))
 		info = append(info, fmt.Sprintf("%d Aim: %.4f", u.Id, u.Aim))
 		info = append(info, fmt.Sprintf("%d Sheilds: %d", u.Id, u.ShieldPotions))
+
+		// obs, ok := st.NearestObstacle(u)
+		// if ok {
+		// pv := pointOnCircle(obs.Radius, obs.Position, u.Position)
+		//
+		// st.debugInterface.AddCircle(pv, prSize, black)
+		// st.debugInterface.AddSegment(u.Position, obs.Position, prSize, black)
+		// }
 	}
+
 	for i, msg := range info {
 		st.debugInterface.AddPlacedText(
 			Vec2{u.Position.X, u.Position.Y + float64(i)*float64(mainSize+1.0)},
@@ -412,20 +475,21 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 			greenLine[p.Id] = u
 		}
 	}
-	for _, u := range st.projectiles {
+	for _, p := range st.projectiles {
 		color := red025
-		p1 := Vec2{u.Position.X - u.Velocity.X*scale, u.Position.Y - u.Velocity.Y*scale}
-		p2 := Vec2{u.Position.X + u.Velocity.X, u.Position.Y + u.Velocity.Y}
-		if uu, ok := greenLine[u.Id]; ok {
+		p1 := Vec2{p.Position.X - p.Velocity.X*scale, p.Position.Y - p.Velocity.Y*scale}
+		p2 := Vec2{p.Position.X + p.Velocity.X, p.Position.Y + p.Velocity.Y}
+		if uu, ok := greenLine[p.Id]; ok {
 			color = green
-			p1 := Vec2{u.Position.X - u.Velocity.X + 300, u.Position.Y - u.Velocity.Y + 300}
-			p2 := Vec2{u.Position.X + u.Velocity.X + 300, u.Position.Y + u.Velocity.Y + 300}
-			proj := distPointToLine2(uu.Position, p1, p2)
-			fmt.Println(uu.Position, proj, uu.Position.Minus(proj))
-			// if dist <= st.URadius() {
-			st.debugInterface.AddSegment(uu.Position, proj, prSize, color)
-			st.debugInterface.AddCircle(proj, bigLineSize, black)
-			// }
+			// p1 := Vec2{p.Position.X - p.Velocity.X + 300, p.Position.Y - p.Velocity.Y + 300}
+			// p2 := Vec2{p.Position.X + p.Velocity.X + 300, p.Position.Y + p.Velocity.Y + 300}
+			d := distantion(uu.Position, p.Position)
+			pv := pointOnCircle(d, p.Position, p2)
+			st.debugInterface.AddRing(p.Position, d, prSize, black)
+			st.debugInterface.AddCircle(pv, bigLineSize, color)
+
+			vec := u.Position.Minus(pv)
+			st.debugInterface.AddSegment(pv, Vec2{u.Position.X + vec.X*100, u.Position.Y + vec.Y*100}, prSize, blue25)
 		}
 		st.debugInterface.AddSegment(p1, p2, prSize, color)
 	}
@@ -446,7 +510,7 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 		// )
 		st.debugInterface.AddSegment(
 			u.Position,
-			Vec2{u.Position.X + u.Velocity.X*u.Direction.X, u.Position.Y + u.Velocity.Y*u.Direction.Y},
+			Vec2{u.Position.X - u.Velocity.X*u.Direction.X, u.Position.Y - u.Velocity.Y*u.Direction.Y},
 			lineSize,
 			black05,
 		)
@@ -479,8 +543,9 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 	}
 }
 
-func (st *MyStrategy) finish() {
+func (st MyStrategy) finish() {
 
+	fmt.Println("finish")
 	if st.debugInterface == nil {
 		return
 	}
