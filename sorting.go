@@ -8,6 +8,7 @@ import (
 func (st *MyStrategy) NearestLootWeapon(u Unit) (Loot, bool) {
 	if len(st.lootsW) > 0 {
 		sort.Sort(NewByDistanceLoot(u, st.lootsW))
+		st.lootWpt = &st.lootsW[0]
 		return st.lootsW[0], true
 	}
 	return Loot{}, false
@@ -32,6 +33,7 @@ func (st *MyStrategy) NearestLootSheild(u Unit) (Loot, bool) {
 func (st *MyStrategy) NearestAim(u Unit) (Unit, bool) {
 	if len(st.aims) > 0 {
 		sort.Sort(NewByDistance(u, st.aims))
+		st.aim = &st.aims[0]
 		return st.aims[0], true
 	}
 	return Unit{}, false
@@ -43,6 +45,14 @@ func (st *MyStrategy) NearestProj(u Unit) (Projectile, bool) {
 		return st.projectiles[0], true
 	}
 	return Projectile{}, false
+}
+
+func (st *MyStrategy) NearestProjs(u Unit, cnt int) []Projectile {
+	if len(st.projectiles) > cnt {
+		sort.Sort(NewByDistanceProjectiles(u, st.projectiles))
+		return st.projectiles[:cnt]
+	}
+	return []Projectile{}
 }
 
 func (st *MyStrategy) NearestObstacle(u Unit) (Obstacle, bool) {

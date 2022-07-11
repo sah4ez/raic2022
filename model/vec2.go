@@ -44,6 +44,13 @@ func (v Vec2) Mult(f float64) Vec2 {
 	}
 }
 
+func (v Vec2) Scalar(f Vec2) Vec2 {
+	return Vec2{
+		X: v.X * f.X,
+		Y: v.Y * f.Y,
+	}
+}
+
 func (v1 Vec2) Distance(v2 Vec2) float64 {
 	return math.Sqrt(math.Pow(float64(v2.X-v1.X), float64(2)) + math.Pow(float64(v2.Y-v1.Y), float64(2)))
 }

@@ -41,6 +41,8 @@ type Unit struct {
 	Ammo []int32
 	// Number of shield potions in inventory
 	ShieldPotions int32
+
+	ActionResult string
 }
 
 func (u Unit) OnPoint(p Vec2, radius float64) bool {
