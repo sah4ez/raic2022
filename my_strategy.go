@@ -440,15 +440,8 @@ func (st *MyStrategy) DoActionUnit() {
 				}
 			}
 
-			propW := consts.Weapons[aim.WeaponIndex()]
-			aimD := distantion(u.Position, aim.Position)
 			act := NewActionOrderAim(true)
 			action = &act
-
-			if aim.WeaponIndex() == 1 && float64(propW.ProjectileSpeed/propW.ProjectileLifeTime) > aimD {
-				act := NewActionOrderAim(false)
-				action = &act
-			}
 			st.MoveUnit(u, st.NewUnitOrder(u, vecV, vecD, &action))
 			u.ActionResult = "moveAttack"
 			p(u)
