@@ -136,3 +136,10 @@ func pointOnCircle(r float64, p1 Vec2, p2 Vec2) Vec2 {
 	return Vec2{X: p1.X + dx*r, Y: p1.Y + dy*r}
 
 }
+
+func rotatePoints(point Vec2, center Vec2, angle float64) Vec2 {
+	angle = (angle) * (math.Pi / angle) // Convert to radians
+	var rotatedX = math.Cos(angle)*(point.X-center.X) - math.Sin(angle)*(point.Y-center.Y) + center.X
+	var rotatedY = math.Sin(angle)*(point.X-center.X) + math.Cos(angle)*(point.Y-center.Y) + center.Y
+	return Vec2{rotatedX, rotatedY}
+}

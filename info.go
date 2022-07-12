@@ -26,7 +26,9 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 	// st.debugInterface.AddRect(Vec2{X: ct.X - r, Y: ct.Y - r}, Vec2{X: ct.X + r, Y: ct.Y + r}, black)
 	info := []string{
 		fmt.Sprintf("   ID: %d", st.game.MyId),
+		fmt.Sprintf("  MSP: %d", st.consts.MaxShieldPotionsInInventory),
 		fmt.Sprintf(" tick: %d", st.game.CurrentTick),
+		fmt.Sprintf("sTick: %d", nextSheildTick),
 		fmt.Sprintf("units: %d", len(st.aims)),
 		fmt.Sprintf("  prj: %d", len(st.projectiles)),
 		fmt.Sprintf("loots: a:%d  w:%d  s:%d", len(st.lootsA), len(st.lootsW), len(st.lootsS)),
@@ -98,9 +100,11 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 			pv := pointOnCircle(d, p.Position, p2)
 			st.debugInterface.AddRing(p.Position, d, prSize, black)
 			st.debugInterface.AddCircle(pv, bigLineSize, color)
+			vecV1 := rotatePoints(pv, u.Position, 180.0)
+			st.debugInterface.AddCircle(vecV1, lootSize, color)
 
-			vec := u.Position.Plus(p.Position.Minus(pv))
-			st.debugInterface.AddSegment(pv, Vec2{u.Position.X + vec.X*100, u.Position.Y + vec.Y*100}, prSize, blue25)
+			// vec := u.Position.Plus(p.Position.Minus(pv))
+			// st.debugInterface.AddSegment(pv, Vec2{u.Position.X + vec.X*100, u.Position.Y + vec.Y*100}, prSize, blue25)
 		}
 		st.debugInterface.AddSegment(p1, p2, prSize, color)
 	}
