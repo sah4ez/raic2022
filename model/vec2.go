@@ -44,6 +44,10 @@ func (v Vec2) Mult(f float64) Vec2 {
 	}
 }
 
+func (v Vec2) Invert() Vec2 {
+	return v.Mult(-1.0)
+}
+
 func (v Vec2) Scalar(f Vec2) Vec2 {
 	return Vec2{
 		X: v.X * f.X,

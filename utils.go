@@ -143,3 +143,9 @@ func rotatePoints(point Vec2, center Vec2, angle float64) Vec2 {
 	var rotatedY = math.Sin(angle)*(point.X-center.X) + math.Cos(angle)*(point.Y-center.Y) + center.Y
 	return Vec2{rotatedX, rotatedY}
 }
+
+func prjectilePointPjr(u Unit, prj Projectile) Vec2 {
+	p2 := Vec2{prj.Position.X + prj.Velocity.X, prj.Position.Y + prj.Velocity.Y}
+	d := distantion(u.Position, prj.Position)
+	return pointOnCircle(d, prj.Position, p2)
+}
