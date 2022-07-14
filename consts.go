@@ -32,7 +32,7 @@ var (
 	lineAttackSize = 1.0
 	bigLineSize    = 0.5
 	angleWalk      = 1.0
-	deltaDist      = 0.9
+	deltaDist      = 0.85
 
 	soundRingRadius = 1.2
 	soundRingSize   = 0.2

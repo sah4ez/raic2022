@@ -11,8 +11,10 @@ run:
 	./aicup22 --config config_empty.json --log-level info
 
 zip:
-	zip ./bin/my_stratage${VERSION}.zip ./*.go \
+	zip -r ./bin/my_stratage${VERSION}.zip ./*.go \
 		./go.mod \
+		./go.sum \
+		./vendor/* \
 		./debugging/ \
 		./debugging/debug_command.go \
 		./debugging/debug_state.go \

@@ -109,20 +109,6 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 		st.debugInterface.AddSegment(p1, p2, prSize, color)
 	}
 	for _, u := range st.units {
-		// fmt.Println(
-		// ">>>>>",
-		// u.Position,
-		// u.Direction,
-		// st.unitOrders[u.Id].TargetDirection,
-		// st.unitOrders[u.Id].TargetVelocity,
-		// u.Velocity,
-		// )
-		// st.debugInterface.AddSegment(
-		// u.Position,
-		// st.unitOrders[u.Id].TargetDirection,
-		// lineSize,
-		// black,
-		// )
 		st.debugInterface.AddSegment(
 			u.Position,
 			u.Position.Plus(u.Velocity),

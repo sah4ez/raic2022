@@ -30,6 +30,23 @@ func (v Vec2) Minus(t Vec2) Vec2 {
 		Y: v.Y - t.Y,
 	}
 }
+
+func (v Vec2) Noramalize() Vec2 {
+	m := math.Sqrt(v.X*v.X + v.Y*v.Y)
+	return Vec2{
+		v.X / m,
+		v.Y / m,
+	}
+}
+
+func (v Vec2) Magnitude() float64 {
+	return math.Sqrt(v.X*v.X + v.Y*v.Y)
+}
+
+func (v Vec2) MinusU(u Unit) Vec2 {
+	return v.Minus(u.Position)
+}
+
 func (v Vec2) Plus(t Vec2) Vec2 {
 	return Vec2{
 		X: v.X + t.X,
@@ -53,6 +70,13 @@ func (v Vec2) Scalar(f Vec2) Vec2 {
 		X: v.X * f.X,
 		Y: v.Y * f.Y,
 	}
+}
+
+func (v Vec2) Log() string {
+	return "[" +
+		fmt.Sprintf("%.f", v.X) + ":" +
+		fmt.Sprintf("%.f", v.Y) +
+		"]"
 }
 
 func (v1 Vec2) Distance(v2 Vec2) float64 {
