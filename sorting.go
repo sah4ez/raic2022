@@ -9,7 +9,12 @@ func (st *MyStrategy) NearestLootWeapon(u Unit) (Loot, bool) {
 	if len(st.lootsW) > 0 {
 		sort.Sort(NewByDistanceLoot(u, st.lootsW))
 		st.lootWpt = &st.lootsW[0]
-		return st.lootsW[0], true
+		for _, l := range st.lootsW {
+			if w, ok := l.Item.(ItemWeapon); ok && w.TypeIndex > u.WeaponIndex() {
+				return l, true
+			}
+		}
+		return Loot{}, false
 	}
 	return Loot{}, false
 }
@@ -18,6 +23,19 @@ func (st *MyStrategy) NearestLootAmmo(u Unit) (Loot, bool) {
 	if len(st.lootsA) > 0 {
 		sort.Sort(NewByDistanceLoot(u, st.lootsA))
 		return st.lootsA[0], true
+	}
+	return Loot{}, false
+}
+
+func (st *MyStrategy) NearestLootAmmoByTypeIndex(u Unit) (Loot, bool) {
+	if len(st.lootsA) > 0 {
+		sort.Sort(NewByDistanceLoot(u, st.lootsA))
+		for _, a := range st.lootsA {
+			if w, ok := a.Item.(ItemAmmo); ok && w.WeaponTypeIndex == u.WeaponIndex() {
+				return a, true
+			}
+		}
+		return Loot{}, false
 	}
 	return Loot{}, false
 }

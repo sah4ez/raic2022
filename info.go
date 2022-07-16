@@ -9,6 +9,8 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 	if st.debugInterface == nil {
 		return
 	}
+	st.debugLock.Lock()
+	defer st.debugLock.Unlock()
 
 	st.debugInterface.Clear()
 	defer st.debugInterface.Flush()
@@ -34,10 +36,16 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 		fmt.Sprintf("loots: a:%d  w:%d  s:%d", len(st.lootsA), len(st.lootsW), len(st.lootsS)),
 	}
 
-	for _, s := range st.sounds {
-		st.debugInterface.AddRing(s.Position, soundRingRadius, soundRingSize, blue25)
-	}
 	for _, u := range st.units {
+		for _, s := range st.sounds {
+			soundD := distantion(s.Position, u.Position)
+			soundProp := st.consts.Sounds[s.TypeIndex]
+			if soundD <= soundProp.Distance {
+				st.debugInterface.AddRing(s.Position, soundRingRadius, soundRingSize, red025)
+			} else {
+				st.debugInterface.AddRing(s.Position, soundRingRadius, soundRingSize, blue25)
+			}
+		}
 
 		info = append(info, fmt.Sprintf("action: %s", u.ActionResult))
 		info = append(info, fmt.Sprintf("p: %.2f : %.2f", u.Position.X, u.Position.Y))
