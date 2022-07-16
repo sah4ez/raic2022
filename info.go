@@ -36,7 +36,6 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 
 	for _, s := range st.sounds {
 		st.debugInterface.AddRing(s.Position, soundRingRadius, soundRingSize, blue25)
-		fmt.Println(">>>>", s.Position)
 	}
 	for _, u := range st.units {
 
@@ -44,9 +43,14 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 		info = append(info, fmt.Sprintf("p: %.2f : %.2f", u.Position.X, u.Position.Y))
 		info = append(info, fmt.Sprintf("v: %.2f : %.2f", u.Velocity.X, u.Velocity.Y))
 		info = append(info, fmt.Sprintf("d: %.2f : %.2f", u.Direction.X, u.Direction.Y))
+		if u.RemainingSpawnTime != nil {
+			info = append(info, fmt.Sprintf("%d r: %.2f", u.Id, *u.RemainingSpawnTime))
+		}
 
 		info = append(info, fmt.Sprintf("%d weapon: %d", u.Id, u.WeaponIndex()))
-		info = append(info, fmt.Sprintf("%d ammo: %d", u.Id, u.Ammo[u.WeaponIndex()]))
+		for i, a := range u.Ammo {
+			info = append(info, fmt.Sprintf("%d a: %d/ %d", u.Id, i, a))
+		}
 		info = append(info, fmt.Sprintf("%d ns: %d", u.Id, u.NextShotTick))
 		info = append(info, fmt.Sprintf("%d Aim: %.4f", u.Id, u.Aim))
 		info = append(info, fmt.Sprintf("%d Sheilds: %d", u.Id, u.ShieldPotions))
