@@ -62,3 +62,11 @@ func NearestObstacle(u Unit) (Obstacle, bool) {
 	}
 	return Obstacle{}, false
 }
+
+func (st *MyStrategy) NearestSound(u Unit) (Sound, bool) {
+	if len(st.sounds) > 0 {
+		sort.Sort(NewByDistanceSound(u, st.sounds))
+		return st.sounds[0], true
+	}
+	return Sound{}, false
+}

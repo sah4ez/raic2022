@@ -79,6 +79,24 @@ func (a ByDistanceObstacle) Less(i, j int) bool {
 	return distantion(a.cur.Position, a.a[i].Position) < distantion(a.cur.Position, a.a[j].Position)
 }
 
+type ByDistanceSound struct {
+	cur Unit
+	a   []Sound
+}
+
+func NewByDistanceSound(cur Unit, a []Sound) ByDistanceSound {
+	return ByDistanceSound{
+		cur: cur,
+		a:   a,
+	}
+}
+
+func (a ByDistanceSound) Len() int      { return len(a.a) }
+func (a ByDistanceSound) Swap(i, j int) { a.a[i], a.a[j] = a.a[j], a.a[i] }
+func (a ByDistanceSound) Less(i, j int) bool {
+	return distantion(a.cur.Position, a.a[i].Position) < distantion(a.cur.Position, a.a[j].Position)
+}
+
 func distantion(v1 Vec2, v2 Vec2) float64 {
 	return math.Sqrt(math.Pow(float64(v2.X-v1.X), float64(2)) + math.Pow(float64(v2.Y-v1.Y), float64(2)))
 }

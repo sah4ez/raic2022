@@ -35,7 +35,7 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 	}
 
 	for _, s := range st.sounds {
-		st.debugInterface.AddRing(s.Position, soundRingRadius, soundRingSize, black05)
+		st.debugInterface.AddRing(s.Position, soundRingRadius, soundRingSize, blue25)
 		fmt.Println(">>>>", s.Position)
 	}
 	for _, u := range st.units {
