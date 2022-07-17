@@ -47,6 +47,7 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 			}
 		}
 
+		info = append(info, fmt.Sprintf("uid: %d", u.Id))
 		info = append(info, fmt.Sprintf("action: %s", u.ActionResult))
 		info = append(info, fmt.Sprintf("p: %.2f : %.2f", u.Position.X, u.Position.Y))
 		info = append(info, fmt.Sprintf("v: %.2f : %.2f", u.Velocity.X, u.Velocity.Y))

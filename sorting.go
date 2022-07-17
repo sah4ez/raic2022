@@ -57,6 +57,21 @@ func (st *MyStrategy) NearestAim(u Unit) (Unit, bool) {
 	return Unit{}, false
 }
 
+func (st *MyStrategy) NearestUnit(u Unit) (Unit, bool) {
+	units := make([]Unit, len(st.units))
+	if len(units) > 0 {
+		sort.Sort(NewByDistance(u, units))
+		for _, uu := range units {
+			if uu.Id == u.Id {
+				continue
+			}
+			return uu, true
+		}
+		return Unit{}, false
+	}
+	return Unit{}, false
+}
+
 func (st *MyStrategy) NearestProj(u Unit) (Projectile, bool) {
 	if len(st.projectiles) > 0 {
 		sort.Sort(NewByDistanceProjectiles(u, st.projectiles))

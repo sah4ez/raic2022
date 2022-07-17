@@ -352,9 +352,11 @@ func (st *MyStrategy) pickupWeapon(l zerolog.Logger, vecV Vec2, vecD Vec2, u Uni
 	}
 	loot, ok := st.NearestLootWeapon(u)
 	if ok {
-		w, ok := loot.Item.(ItemWeapon)
-		if !ok || u.Ammo[w.TypeIndex] == 0 {
-			return false
+		if u.Weapon != nil {
+			w, ok := loot.Item.(ItemWeapon)
+			if !ok || u.Ammo[w.TypeIndex] == 0 {
+				return false
+			}
 		}
 
 		l = l.With().
@@ -421,12 +423,24 @@ func (st *MyStrategy) pickupAmmo(l zerolog.Logger, vecV Vec2, vecD Vec2, u Unit)
 
 func (st *MyStrategy) pickupWalkingAmmo(l zerolog.Logger, vecV Vec2, vecD Vec2, u Unit) bool {
 	prop := st.consts.Weapons[u.WeaponIndex()]
-	if u.Ammo[u.WeaponIndex()] == prop.MaxInventoryAmmo {
-		return false
+
+	{
+		full := false
+		for i, prop := range st.consts.Weapons {
+			if u.Ammo[i] == prop.MaxInventoryAmmo {
+				full = full && true
+			}
+		}
+		if full {
+			return false
+		}
 	}
 
 	var action ActionOrder
 	loot, ok := st.NearestLootAmmoByTypeIndex(u)
+	if u.Ammo[u.WeaponIndex()] == prop.MaxInventoryAmmo {
+		loot, ok = st.NearestLootAmmo(u)
+	}
 	if ok && u.OnPoint(loot.Position, st.URadius()) {
 		vecD = loot.Position.Minus(u.Position)
 		vecV1 := loot.Position.Minus(u.Position)
@@ -551,6 +565,12 @@ func (st *MyStrategy) Respawn(l zerolog.Logger, u Unit, vecV Vec2, vecD Vec2) bo
 			st.MoveUnit(l, "spawn moving", u, st.NewUnitOrder(u, vecV, vecD, nil))
 			return true
 		}
+		uu, uok := st.NearestUnit(u)
+		if uok {
+			vecV = u.Position.Minus(uu.Position)
+			vecD = u.Position.Minus(uu.Position)
+			st.MoveUnit(l, "spawn moving", u, st.NewUnitOrder(u, vecV, vecD, nil))
+		}
 	}
 	return false
 }
@@ -627,6 +647,11 @@ func (st *MyStrategy) DoActionUnit(u Unit, wg *sync.WaitGroup) {
 
 	if st.Respawn(l, u, vecV, vecD) {
 		return
+	}
+	if u.Weapon == nil {
+		if st.pickupWeapon(l, vecV, vecD, u) {
+			return
+		}
 	}
 
 	sound, soundOk := st.NearestSound(u)
