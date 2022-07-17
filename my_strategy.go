@@ -6,6 +6,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"sort"
 	"sync"
 	"time"
 
@@ -299,13 +300,17 @@ func (st *MyStrategy) MaxUVel() float64 {
 	return st.consts.MaxUnitForwardSpeed
 }
 
-func LineAttackBussy(u Unit, aim Unit) (free bool) {
+func LineAttackBussy(u Unit, aim Unit) (o Obstacle, free bool) {
 	if _, ok := NearestObstacle(u); !ok {
-		return ok
+		return Obstacle{}, false
 	}
 
+	obs := make([]Obstacle, len(consts.Obstacles))
+	copy(obs, consts.Obstacles)
+
+	sort.Sort(NewByDistanceObstacle(u, obs))
 	d := distantion(aim.Position, u.Position)
-	for _, o := range consts.Obstacles {
+	for _, o := range obs {
 		if d := distantion(o.Position, u.Position); d > consts.ViewDistance {
 			break
 		}
@@ -316,11 +321,11 @@ func LineAttackBussy(u Unit, aim Unit) (free bool) {
 		dUO := distantion(u.Position, o.Position)
 		if dAO+dUO < d+o.Radius {
 			// fmt.Println("o>", o.Position, dAO, dUO, o.Radius, d)
-			return true
+			return o, true
 		}
 	}
 
-	return false
+	return Obstacle{}, false
 }
 
 func newWalking(l zerolog.Logger, vecV Vec2, vecD Vec2) zerolog.Logger {
@@ -733,8 +738,8 @@ func (st *MyStrategy) DoActionUnit(u Unit, wg *sync.WaitGroup) {
 				vecV = u.Position.Plus(vecV1)
 			}
 		}
-		busy := LineAttackBussy(u, aim)
-		l = l.With().Float64("aim", u.Aim).Bool("busy", busy).Logger()
+		o, busy := LineAttackBussy(u, aim)
+		l = l.With().Float64("aim", u.Aim).Bool("busy", busy).Str("o", o.Position.Log()).Logger()
 
 		act := NewActionOrderAim(!busy)
 		action = &act
@@ -757,6 +762,9 @@ func (st *MyStrategy) DoActionUnit(u Unit, wg *sync.WaitGroup) {
 		// vecV2 = vecV2.Noramalize()
 		// vecV = vecV.Minus(vecV2.Mult(3.0))
 		// }
+		if u.IsArcher() {
+			vecD = vecD.Plus(aim.Velocity.Noramalize().Mult(st.URadius()))
+		}
 		st.MoveUnit(l, "moveAttack", u, st.NewUnitOrder(u, vecV, vecD, &action))
 		return
 	} else if aimOk {

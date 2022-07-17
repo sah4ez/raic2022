@@ -77,8 +77,17 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 		st.debugInterface.AddSegment(u.Position, w.Position, prSize, black05)
 	}
 
-	if u := st.aim; u != nil {
-		st.debugInterface.AddCircle(u.Position, 2.0*twoSize, black25)
+	for _, u := range st.units {
+
+		a, ok := st.NearestAim(u)
+		if ok {
+			st.debugInterface.AddCircle(a.Position, 2.0*twoSize, black25)
+			o, busy := LineAttackBussy(u, a)
+			st.debugInterface.AddCircle(o.Position, 2.0*twoSize, black)
+			if busy {
+				st.debugInterface.AddCircle(o.Position, twoSize, red)
+			}
+		}
 	}
 	for _, u := range st.aims {
 		st.debugInterface.AddSegment(u.Position, u.Position.Plus(u.Velocity), prSize, black05)
