@@ -555,7 +555,7 @@ func (st *MyStrategy) Respawn(l zerolog.Logger, u Unit, vecV Vec2, vecD Vec2) bo
 	return false
 }
 
-func (st *MyStrategy) Shield(l zerolog.Logger, u Unit, vecV Vec2, vecD Vec2) bool {
+func (st *MyStrategy) Shield(l zerolog.Logger, u Unit, vecV Vec2, vecD Vec2, prjOk bool) bool {
 
 	var action ActionOrder
 	st.lShield.Lock()
@@ -584,7 +584,7 @@ func (st *MyStrategy) Shield(l zerolog.Logger, u Unit, vecV Vec2, vecD Vec2) boo
 			vecD = rotate(u.Position, math.Pi)
 			st.MoveUnit(l, "useSheild", u, st.NewUnitOrder(u, vecV, vecD, &action))
 			return true
-		} else {
+		} else if !prjOk {
 			if sheildOk && u.OnPoint(loot.Position, st.URadius()) {
 				act := NewActionOrderPickup(loot.Id)
 				action = &act
@@ -660,7 +660,7 @@ func (st *MyStrategy) DoActionUnit(u Unit, wg *sync.WaitGroup) {
 		}
 	}
 
-	if st.Shield(l, u, vecV, vecD) {
+	if st.Shield(l, u, vecV, vecD, prjOk) {
 		return
 	}
 
@@ -702,7 +702,7 @@ func (st *MyStrategy) DoActionUnit(u Unit, wg *sync.WaitGroup) {
 			if soundProp.Name == "BowHit" {
 				vecD = sound.Position
 			}
-			if soundProp.Name == "Staff" {
+			if soundProp.Name == "Staff" || soundProp.Name == "StaffHit" {
 				vecV1 := sound.Position.Noramalize()
 				vecV1 = vecV1.Mult(MaxBU())
 				vecV = u.Position.Plus(vecV1)
@@ -750,8 +750,10 @@ func (st *MyStrategy) DoActionUnit(u Unit, wg *sync.WaitGroup) {
 			if soundProp.Name == "BowHit" {
 				vecD = sound.Position
 			}
-			if soundProp.Name == "Staff" {
+			if soundProp.Name == "Staff" || soundProp.Name == "StaffHit" {
 				vecV = sound.Position.Plus(u.Position)
+				st.MoveUnit(l, "moveAttackToAim", u, st.NewUnitOrder(u, vecV, vecD, nil))
+				return
 			}
 		}
 
@@ -768,7 +770,7 @@ func (st *MyStrategy) DoActionUnit(u Unit, wg *sync.WaitGroup) {
 			if d <= ammoD*deltaDist && !prjOk {
 				// vecV = vecV.Mult(-1.0)
 				// пытаемся сместиться в случае отступления к центру карты
-				vecV = st.game.Zone.CurrentCenter.Minus(u.Position)
+				// vecV = st.game.Zone.CurrentCenter.Minus(u.Position)
 			} else if st.pickupWeapon(l, vecV, vecD, u) {
 				return
 			} else if st.pickupAmmo(l, vecV, vecD, u) {
