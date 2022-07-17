@@ -38,6 +38,9 @@ type MyStrategy struct {
 	game           Game
 	me             Player
 
+	lAll   *sync.RWMutex
+	allIDs map[int32]struct{}
+
 	debugLock *sync.RWMutex
 
 	l          *sync.RWMutex
@@ -95,6 +98,7 @@ func NewMyStrategy(constants Constants) *MyStrategy {
 		prevUnits:  make(map[int32]Unit),
 		consts:     constants,
 		l:          new(sync.RWMutex),
+		lAll:       new(sync.RWMutex),
 		debugLock:  new(sync.RWMutex),
 		unitOrders: make(map[int32]UnitOrder),
 		prevLoot:   make(map[int32]Loot),
@@ -141,8 +145,12 @@ func (st MyStrategy) GetOrders() map[int32]UnitOrder {
 	st.l.RLock()
 	defer st.l.RUnlock()
 
+	st.lAll.RLock()
+	defer st.lAll.RUnlock()
 	for k, v := range st.unitOrders {
-		unitOrders[k] = v
+		if _, ok := st.allIDs[k]; ok {
+			unitOrders[k] = v
+		}
 	}
 
 	return unitOrders
@@ -150,6 +158,10 @@ func (st MyStrategy) GetOrders() map[int32]UnitOrder {
 
 func (st MyStrategy) getOrder(game Game, debugInterface *DebugInterface) Order {
 	st.Reset()
+
+	st.lAll.Lock()
+	st.allIDs = make(map[int32]struct{})
+	st.lAll.Unlock()
 
 	di = debugInterface
 	st.debugInterface = debugInterface
@@ -219,10 +231,13 @@ func (st *MyStrategy) LoadProjectilse() {
 }
 
 func (st *MyStrategy) LoadUnits(units []Unit) {
+	st.lAll.Lock()
+	defer st.lAll.Unlock()
 	st.units = make(map[int32]Unit)
 	st.aims = make([]Unit, 0)
 	st.respAims = make([]Unit, 0)
 	for _, u := range units {
+		st.allIDs[u.Id] = struct{}{}
 		if u.PlayerId == st.me.Id {
 			st.units[u.Id] = u
 		} else {
@@ -247,7 +262,10 @@ func (st *MyStrategy) LoadSounds() {
 }
 
 func (st *MyStrategy) LoadLoot() {
+	st.lAll.Lock()
+	defer st.lAll.Unlock()
 	for _, u := range st.game.Loot {
+		st.allIDs[u.Id] = struct{}{}
 		failDistance := distantion(u.Position, st.game.Zone.CurrentCenter)
 		if failDistance < st.game.Zone.CurrentRadius*0.99 {
 			st.loot[u.Id] = u
@@ -710,7 +728,8 @@ func (st *MyStrategy) DoActionUnit() {
 						return
 					}
 				}
-				if vecV.IsZero() {
+				// if vecV.IsZero() {
+				{
 					loot, ok := st.NearestLootAmmoByTypeIndex(u)
 					if ok && u.OnPoint(loot.Position, 2.0*UnitRadius()) {
 						vecV1 := loot.Position.Minus(u.Position)
@@ -721,13 +740,13 @@ func (st *MyStrategy) DoActionUnit() {
 				st.MoveUnit(l, "moveAttackToAim", u, st.NewUnitOrder(u, vecV, vecD, nil))
 				return
 			}
+			if st.pickupWeapon(l, vecV, vecD, u) {
+				return
+			}
 			if st.pickupWalkingAmmo(l, vecV, vecD, u) {
 				return
 			}
 			if st.pickupWalkingShield(l, vecV, vecD, u) {
-				return
-			}
-			if st.pickupWeapon(l, vecV, vecD, u) {
 				return
 			}
 			vecV = st.game.Zone.CurrentCenter.Minus(u.Position)
