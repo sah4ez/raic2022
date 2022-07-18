@@ -31,6 +31,10 @@ func MaxBU() float64 {
 	return consts.MaxUnitBackwardSpeed
 }
 
+func ViewDU() float64 {
+	return consts.ViewDistance
+}
+
 type MyStrategy struct {
 	debugInterface *DebugInterface
 	units          map[int32]Unit
@@ -57,6 +61,7 @@ type MyStrategy struct {
 	lootsA      []Loot
 	lootsS      []Loot
 	aims        []Unit
+	hAims       map[int32]Unit
 	respAims    []Unit
 	prevAims    []Unit
 
@@ -242,6 +247,7 @@ func (st *MyStrategy) LoadUnits(units []Unit) {
 	defer st.lAll.Unlock()
 	st.units = make(map[int32]Unit)
 	st.aims = make([]Unit, 0)
+	st.hAims = make(map[int32]Unit)
 	st.respAims = make([]Unit, 0)
 	for _, u := range units {
 		st.allIDs[u.Id] = struct{}{}
@@ -252,6 +258,7 @@ func (st *MyStrategy) LoadUnits(units []Unit) {
 				st.respAims = append(st.respAims, u)
 			} else {
 				st.aims = append(st.aims, u)
+				st.hAims[u.Id] = u
 			}
 		}
 	}
@@ -348,6 +355,25 @@ func checkProject(l zerolog.Logger, prjPt Vec2, u Unit, aim Unit) (Vec2, zerolog
 		return vecV, l
 	}
 	return Vec2{}, l
+}
+
+func checkProjects(l zerolog.Logger, prjs []Projectile, u Unit, aim Unit) (Vec2, zerolog.Logger) {
+	if len(prjs) == 0 {
+		return Vec2{}, l
+	}
+
+	vecV1 := Vec2{}
+	for _, p := range prjs {
+		v := u.Position.Minus(p.Position).Noramalize()
+		vecV1.X = vecV1.X + v.X
+		vecV1.Y = vecV1.Y + v.Y
+	}
+	l = l.With().
+		Int("prjs", len(prjs)).
+		Str("vecV1", vecV1.Log()).
+		Int32("aimWI", aim.WeaponIndex()).
+		Logger()
+	return vecV1.Mult(MaxBU()), l
 }
 
 func (st *MyStrategy) pickupWeapon(l zerolog.Logger, vecV Vec2, vecD Vec2, u Unit) bool {
@@ -542,7 +568,7 @@ func (st *MyStrategy) FailDistance(l zerolog.Logger, u Unit, vecV Vec2, vecD Vec
 					Logger()
 				vecV = vecV1.Minus(vecV).Mult(MaxFU()) //по тапкам...
 				failDistance := distantion(vecV, st.game.Zone.CurrentCenter)
-				if failDistance > st.game.Zone.CurrentRadius*0.99 {
+				if failDistance > st.game.Zone.CurrentRadius*0.98 {
 					vecV1 := rotatePoints(vecV, prjPt, 180.0)
 					vecV = vecV1.Minus(vecV).Mult(MaxFU()) //по тапкам...
 				}
@@ -663,32 +689,28 @@ func (st *MyStrategy) DoActionUnit(u Unit, wg *sync.WaitGroup) {
 	soundD := distantion(u.Position, sound.Position)
 	soundProp := st.consts.Sounds[sound.TypeIndex]
 
-	delta := zeroVec
-	deltaRotate := 0.0
-	var prjPoint *Vec2
-	var prj Projectile
-	prj, prjOk := st.NearestProj(u)
-	if prjOk {
-		p2 := Vec2{prj.Position.X + prj.Velocity.X, prj.Position.Y + prj.Velocity.Y}
-		d := distantion(u.Position, prj.Position)
-		pv := pointOnCircle(d, prj.Position, p2)
-		prjPoint = &pv
-		if d <= st.URadius()*2.0 {
-			pv := pointOnCircle(d, prj.Position, p2)
-			deltaRotate += angle(u.Direction, prj.Position.Minus(u.Position))
-			dv := distantion(pv, u.Position)
-			if dist := dv - st.URadius(); dist <= st.URadius() {
-				vec := pv.Minus(u.Position)
-				vec = vec.Scalar(Vec2{st.consts.MaxUnitBackwardSpeed, st.consts.MaxUnitBackwardSpeed})
-				delta = Vec2{u.Position.X + vec.X*dv, u.Position.Y + vec.X*dv}
-				l = newWalking(l, vecV, vecD)
-				l.Debug().
-					Str("delta", delta.Log()).
-					Str("pv", pv.Log()).
-					Msg("under attck")
-			}
-		}
-	}
+	prjs, prjOk := st.NearestProjs(u)
+	// var prjPoint *Vec2
+	// var prj Projectile
+	// prj, prjOk := st.NearestProj(u)
+	// if prjOk {
+	// p2 := Vec2{prj.Position.X + prj.Velocity.X, prj.Position.Y + prj.Velocity.Y}
+	// d := distantion(u.Position, prj.Position)
+	// pv := pointOnCircle(d, prj.Position, p2)
+	// prjPoint = &pv
+	// if d <= st.URadius()*2.0 {
+	// pv := pointOnCircle(d, prj.Position, p2)
+	// dv := distantion(pv, u.Position)
+	// if dist := dv - st.URadius(); dist <= st.URadius() {
+	// vec := pv.Minus(u.Position)
+	// vec = vec.Scalar(Vec2{st.consts.MaxUnitBackwardSpeed, st.consts.MaxUnitBackwardSpeed})
+	// l = newWalking(l, vecV, vecD)
+	// l.Debug().
+	// Str("pv", pv.Log()).
+	// Msg("under attck")
+	// }
+	// }
+	// }
 
 	if st.Shield(l, u, vecV, vecD, prjOk) {
 		return
@@ -720,13 +742,21 @@ func (st *MyStrategy) DoActionUnit(u Unit, wg *sync.WaitGroup) {
 			// лучник и второй тип
 			vecV = u.Position.Minus(aim.Position).Mult(MaxBU()) // пытаемся максимально отойти от этих ...
 		}
-		if prjPoint != nil {
-			prjV, ll := checkProject(l, *prjPoint, u, aim)
+		// if prjPoint != nil {
+		// prjV, ll := checkProject(l, *prjPoint, u, aim)
+		// if !prjV.IsZero() {
+		// vecV = prjV
+		// l = ll
+		// }
+		// }
+		if prjOk {
+			prjV, ll := checkProjects(l, prjs, u, aim)
 			if !prjV.IsZero() {
 				vecV = prjV
 				l = ll
 			}
 		}
+
 		if soundOk && soundD <= soundProp.Distance {
 			l.Debug().Str("soudnName", soundProp.Name).Msg("under fire sound")
 			if soundProp.Name == "BowHit" {
@@ -752,17 +782,9 @@ func (st *MyStrategy) DoActionUnit(u Unit, wg *sync.WaitGroup) {
 				}
 			}
 		}
-		// if aim.WeaponIndex() == 2 {
-		// vecV2 := st.game.Zone.CurrentCenter.Minus(vecV)
-		// vecV2 = vecV2.Noramalize()
-		// vecV = vecV.Minus(vecV2.Mult(3.0))
-		// }
-		// if aim.WeaponIndex() == 1 {
-		// vecV2 := st.game.Zone.CurrentCenter.Minus(vecV)
-		// vecV2 = vecV2.Noramalize()
-		// vecV = vecV.Minus(vecV2.Mult(3.0))
-		// }
 		if u.IsArcher() {
+			vecD = vecD.Plus(aim.Velocity.Noramalize().Mult(st.URadius()))
+		} else if u.IsStaffer() {
 			vecD = vecD.Plus(aim.Velocity.Noramalize().Mult(st.URadius()))
 		}
 		st.MoveUnit(l, "moveAttack", u, st.NewUnitOrder(u, vecV, vecD, &action))
@@ -778,32 +800,37 @@ func (st *MyStrategy) DoActionUnit(u Unit, wg *sync.WaitGroup) {
 			st.MoveUnit(l, "moveAttackPickupLoot", u, st.NewUnitOrder(u, vecV, vecD, &action))
 			return
 		}
-		if soundOk && soundD <= soundProp.Distance {
+		// if prjPoint != nil {
+		// prjV, ll := checkProject(l, *prjPoint, u, aim)
+		// if !prjV.IsZero() {
+		// vecV = prjV
+		// l = ll
+		// }
+		// }
+		if prjOk {
+			prjV, ll := checkProjects(l, prjs, u, aim)
+			if !prjV.IsZero() {
+				vecV = prjV
+				l = ll
+			}
+		} else if soundOk && soundD <= soundProp.Distance {
 			l.Debug().Str("soudnName", soundProp.Name).Msg("under fire sound")
 			if soundProp.Name == "BowHit" {
 				vecD = sound.Position
 			}
 			if soundProp.Name == "Staff" || soundProp.Name == "StaffHit" {
-				vecV = sound.Position.Plus(u.Position)
-				st.MoveUnit(l, "moveAttackToAim", u, st.NewUnitOrder(u, vecV, vecD, nil))
+				vecV = sound.Position.Minus(u.Position)
+				st.MoveUnit(l, "soundMoveAttackToAim", u, st.NewUnitOrder(u, vecV, vecD, nil))
 				return
-			}
-		}
-
-		if prjPoint != nil {
-			prjV, ll := checkProject(l, *prjPoint, u, aim)
-			if !prjV.IsZero() {
-				vecV = prjV
-				l = ll
 			}
 		}
 
 		if d := u.Position.Distance(aim.Position); d < ammoD { // можем стрелять и есть цель
 			// 90% от дистанции выстрела и не под прицелом
-			if d <= ammoD*deltaDist && !prjOk {
+			if d <= 2.0*st.URadius() && !prjOk {
 				// vecV = vecV.Mult(-1.0)
 				// пытаемся сместиться в случае отступления к центру карты
-				// vecV = st.game.Zone.CurrentCenter.Minus(u.Position)
+				vecV = aim.Position.Minus(u.Position)
 			} else if st.pickupWeapon(l, vecV, vecD, u) {
 				return
 			} else if st.pickupAmmo(l, vecV, vecD, u) {

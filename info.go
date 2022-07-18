@@ -36,42 +36,42 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 		fmt.Sprintf("loots: a:%d  w:%d  s:%d", len(st.lootsA), len(st.lootsW), len(st.lootsS)),
 	}
 
-	for _, u := range st.units {
-		for _, s := range st.sounds {
-			soundD := distantion(s.Position, u.Position)
-			soundProp := st.consts.Sounds[s.TypeIndex]
-			if soundD <= soundProp.Distance {
-				st.debugInterface.AddRing(s.Position, soundRingRadius, soundRingSize, red025)
-			} else {
-				st.debugInterface.AddRing(s.Position, soundRingRadius, soundRingSize, blue25)
-			}
+	// for _, u := range st.units {
+	for _, s := range st.sounds {
+		soundD := distantion(s.Position, u.Position)
+		soundProp := st.consts.Sounds[s.TypeIndex]
+		if soundD <= soundProp.Distance {
+			st.debugInterface.AddRing(s.Position, soundRingRadius, soundRingSize, red025)
+		} else {
+			st.debugInterface.AddRing(s.Position, soundRingRadius, soundRingSize, blue25)
 		}
-
-		info = append(info, fmt.Sprintf("uid: %d", u.Id))
-		info = append(info, fmt.Sprintf("action: %s", u.ActionResult))
-		info = append(info, fmt.Sprintf("p: %.2f : %.2f", u.Position.X, u.Position.Y))
-		info = append(info, fmt.Sprintf("v: %.2f : %.2f", u.Velocity.X, u.Velocity.Y))
-		info = append(info, fmt.Sprintf("d: %.2f : %.2f", u.Direction.X, u.Direction.Y))
-		if u.RemainingSpawnTime != nil {
-			info = append(info, fmt.Sprintf("%d r: %.2f", u.Id, *u.RemainingSpawnTime))
-		}
-
-		info = append(info, fmt.Sprintf("%d weapon: %d", u.Id, u.WeaponIndex()))
-		for i, a := range u.Ammo {
-			info = append(info, fmt.Sprintf("%d a: %d/ %d", u.Id, i, a))
-		}
-		info = append(info, fmt.Sprintf("%d ns: %d", u.Id, u.NextShotTick))
-		info = append(info, fmt.Sprintf("%d Aim: %.4f", u.Id, u.Aim))
-		info = append(info, fmt.Sprintf("%d Sheilds: %d", u.Id, u.ShieldPotions))
-
-		// obs, ok := st.NearestObstacle(u)
-		// if ok {
-		// pv := pointOnCircle(obs.Radius, obs.Position, u.Position)
-		//
-		// st.debugInterface.AddCircle(pv, prSize, black)
-		// st.debugInterface.AddSegment(u.Position, obs.Position, prSize, black)
-		// }
 	}
+
+	info = append(info, fmt.Sprintf("uid: %d", u.Id))
+	info = append(info, fmt.Sprintf("action: %s", u.ActionResult))
+	info = append(info, fmt.Sprintf("p: %.2f : %.2f", u.Position.X, u.Position.Y))
+	info = append(info, fmt.Sprintf("v: %.2f : %.2f", u.Velocity.X, u.Velocity.Y))
+	info = append(info, fmt.Sprintf("d: %.2f : %.2f", u.Direction.X, u.Direction.Y))
+	if u.RemainingSpawnTime != nil {
+		info = append(info, fmt.Sprintf("%d r: %.2f", u.Id, *u.RemainingSpawnTime))
+	}
+
+	info = append(info, fmt.Sprintf("%d weapon: %d", u.Id, u.WeaponIndex()))
+	for i, a := range u.Ammo {
+		info = append(info, fmt.Sprintf("%d a: %d/ %d", u.Id, i, a))
+	}
+	info = append(info, fmt.Sprintf("%d ns: %d", u.Id, u.NextShotTick))
+	info = append(info, fmt.Sprintf("%d Aim: %.4f", u.Id, u.Aim))
+	info = append(info, fmt.Sprintf("%d Sheilds: %d", u.Id, u.ShieldPotions))
+
+	// obs, ok := st.NearestObstacle(u)
+	// if ok {
+	// pv := pointOnCircle(obs.Radius, obs.Position, u.Position)
+	//
+	// st.debugInterface.AddCircle(pv, prSize, black)
+	// st.debugInterface.AddSegment(u.Position, obs.Position, prSize, black)
+	// }
+	// }
 
 	if w := st.lootWpt; w != nil {
 		st.debugInterface.AddSegment(u.Position, w.Position, prSize, black05)
@@ -81,11 +81,11 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 
 		a, ok := st.NearestAim(u)
 		if ok {
-			st.debugInterface.AddCircle(a.Position, 2.0*twoSize, black25)
+			st.debugInterface.AddCircle(a.Position, 1.0*twoSize, black25)
 			o, busy := LineAttackBussy(u, a)
-			st.debugInterface.AddCircle(o.Position, 2.0*twoSize, black)
+			st.debugInterface.AddCircle(o.Position, 1.0*twoSize, black)
 			if busy {
-				st.debugInterface.AddCircle(o.Position, twoSize, red)
+				st.debugInterface.AddCircle(o.Position, 0.5*twoSize, red)
 			}
 		}
 	}
@@ -116,20 +116,37 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 		p2 := Vec2{p.Position.X + p.Velocity.X, p.Position.Y + p.Velocity.Y}
 		if uu, ok := greenLine[p.Id]; ok {
 			color = green
-			// p1 := Vec2{p.Position.X - p.Velocity.X + 300, p.Position.Y - p.Velocity.Y + 300}
-			// p2 := Vec2{p.Position.X + p.Velocity.X + 300, p.Position.Y + p.Velocity.Y + 300}
 			d := distantion(uu.Position, p.Position)
 			pv := pointOnCircle(d, p.Position, p2)
 			st.debugInterface.AddRing(p.Position, d, prSize, black)
 			st.debugInterface.AddCircle(pv, bigLineSize, color)
 			vecV1 := rotatePoints(pv, u.Position, 180.0)
 			st.debugInterface.AddCircle(vecV1, lootSize, color)
-
-			// vec := u.Position.Plus(p.Position.Minus(pv))
-			// st.debugInterface.AddSegment(pv, Vec2{u.Position.X + vec.X*100, u.Position.Y + vec.Y*100}, prSize, blue25)
 		}
 		st.debugInterface.AddSegment(p1, p2, prSize, color)
 	}
+
+	prjs, ok := st.NearestProjs(u)
+
+	if ok {
+
+		for _, p := range prjs {
+			st.debugInterface.AddCircle(p.Position, 2.0*prSize, blue05)
+			v := u.Position.Minus(p.Position).Noramalize().Mult(MaxBU())
+			st.debugInterface.AddSegment(p.Position, p.Position.Plus(v), prSize, blue05)
+			// st.debugInterface.AddSegment(u.Position, u.Position.Minus(v), prSize, blue)
+			st.debugInterface.AddCircle(v, 2.0*prSize, blue05)
+		}
+
+		vecV1 := Vec2{}
+		for _, p := range prjs {
+			v := u.Position.Minus(p.Position).Noramalize()
+			vecV1.X = vecV1.X + v.X
+			vecV1.Y = vecV1.Y + v.Y
+		}
+		st.debugInterface.AddSegment(u.Position, vecV1.Noramalize().Mult(MaxBU()), 3.0*prSize, blue)
+	}
+
 	for _, u := range st.units {
 		st.debugInterface.AddSegment(
 			u.Position,

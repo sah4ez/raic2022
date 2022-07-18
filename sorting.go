@@ -80,12 +80,32 @@ func (st *MyStrategy) NearestProj(u Unit) (Projectile, bool) {
 	return Projectile{}, false
 }
 
-func (st *MyStrategy) NearestProjs(u Unit, cnt int) []Projectile {
-	if len(st.projectiles) > cnt {
+func (st *MyStrategy) NearestProjs(u Unit) ([]Projectile, bool) {
+	if len(st.projectiles) > 0 {
+		result := make([]Projectile, 0)
 		sort.Sort(NewByDistanceProjectiles(u, st.projectiles))
-		return st.projectiles[:cnt]
+
+		for _, p := range st.projectiles {
+			if shooter, ok := st.hAims[p.ShooterId]; ok {
+				distToProject := distantion(shooter.Position, p.Position)
+				prjOk := shooter.OnPoint(u.Position, distToProject-st.URadius())
+
+				if ok := u.OnPoint(p.Position, 0.8*ViewDU()); ok && !prjOk {
+					result = append(result, p)
+				}
+			} else {
+				if ok := u.OnPoint(p.Position, 0.8*ViewDU()); ok {
+					result = append(result, p)
+				}
+			}
+
+		}
+		if len(result) == 0 {
+			return nil, false
+		}
+		return result, true
 	}
-	return []Projectile{}
+	return nil, false
 }
 
 func NearestObstacle(u Unit) (Obstacle, bool) {

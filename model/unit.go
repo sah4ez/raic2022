@@ -60,6 +60,10 @@ func (u Unit) IsArcher() bool {
 	return u.WeaponIndex() == 2
 }
 
+func (u Unit) IsStaffer() bool {
+	return u.WeaponIndex() == 1
+}
+
 func (u Unit) CanShoot(tick int32) bool {
 	return u.NextShotTick == 0 || u.NextShotTick <= tick
 }
