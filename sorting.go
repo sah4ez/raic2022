@@ -86,19 +86,18 @@ func (st *MyStrategy) NearestProjs(u Unit) ([]Projectile, bool) {
 		sort.Sort(NewByDistanceProjectiles(u, st.projectiles))
 
 		for _, p := range st.projectiles {
-			if shooter, ok := st.hAims[p.ShooterId]; ok {
-				distToProject := distantion(shooter.Position, p.Position)
-				prjOk := shooter.OnPoint(u.Position, distToProject-st.URadius())
-
-				if ok := u.OnPoint(p.Position, 0.8*ViewDU()); ok && !prjOk {
-					result = append(result, p)
-				}
-			} else {
-				if ok := u.OnPoint(p.Position, 0.8*ViewDU()); ok {
-					result = append(result, p)
-				}
+			// if shooter, ok := st.hAims[p.ShooterId]; ok {
+			// distToProject := distantion(shooter.Position, p.Position)
+			// prjOk := shooter.OnPoint(u.Position, distToProject-st.URadius())
+			//
+			// if ok := u.OnPoint(p.Position, 0.8*ViewDU()); ok && !prjOk {
+			// result = append(result, p)
+			// }
+			// } else {
+			if ok := u.OnPoint(p.Position, 0.8*ViewDU()); ok {
+				result = append(result, p)
 			}
-
+			// }
 		}
 		if len(result) == 0 {
 			return nil, false

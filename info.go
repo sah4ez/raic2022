@@ -3,19 +3,17 @@ package main
 import (
 	. "ai_cup_22/model"
 	"fmt"
+	"math"
 )
 
-func (st *MyStrategy) PrintUnitInfo(u Unit) {
-	if st.debugInterface == nil {
+func (st *MyStrategy) PrintUnitInfo(debugInterface *DebugInterface, u Unit) {
+	if debugInterface == nil {
 		return
 	}
 	st.debugLock.Lock()
 	defer st.debugLock.Unlock()
 
-	st.debugInterface.Clear()
-	defer st.debugInterface.Flush()
-
-	st.debugInterface.AddPlacedText(
+	debugInterface.AddPlacedText(
 		zeroVec,
 		fmt.Sprintf("%.4f, %.4f:%.4f", u.Health, u.Position.X, u.Position.Y),
 		zeroVec,
@@ -36,14 +34,13 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 		fmt.Sprintf("loots: a:%d  w:%d  s:%d", len(st.lootsA), len(st.lootsW), len(st.lootsS)),
 	}
 
-	// for _, u := range st.units {
 	for _, s := range st.sounds {
 		soundD := distantion(s.Position, u.Position)
 		soundProp := st.consts.Sounds[s.TypeIndex]
 		if soundD <= soundProp.Distance {
-			st.debugInterface.AddRing(s.Position, soundRingRadius, soundRingSize, red025)
+			debugInterface.AddRing(s.Position, soundRingRadius, soundRingSize, red025)
 		} else {
-			st.debugInterface.AddRing(s.Position, soundRingRadius, soundRingSize, blue25)
+			debugInterface.AddRing(s.Position, soundRingRadius, soundRingSize, blue25)
 		}
 	}
 
@@ -74,27 +71,24 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 	// }
 
 	if w := st.lootWpt; w != nil {
-		st.debugInterface.AddSegment(u.Position, w.Position, prSize, black05)
+		debugInterface.AddSegment(u.Position, w.Position, prSize, black05)
 	}
 
-	for _, u := range st.units {
-
-		a, ok := st.NearestAim(u)
-		if ok {
-			st.debugInterface.AddCircle(a.Position, 1.0*twoSize, black25)
-			o, busy := LineAttackBussy(u, a)
-			st.debugInterface.AddCircle(o.Position, 1.0*twoSize, black)
-			if busy {
-				st.debugInterface.AddCircle(o.Position, 0.5*twoSize, red)
-			}
+	a, ok := st.NearestAim(u)
+	if ok {
+		debugInterface.AddCircle(a.Position, 1.0*twoSize, black25)
+		o, busy := LineAttackBussy(u, a)
+		debugInterface.AddCircle(o.Position, 1.0*twoSize, black)
+		if busy {
+			debugInterface.AddCircle(o.Position, 0.5*twoSize, red)
 		}
 	}
 	for _, u := range st.aims {
-		st.debugInterface.AddSegment(u.Position, u.Position.Plus(u.Velocity), prSize, black05)
+		debugInterface.AddSegment(u.Position, u.Position.Plus(u.Velocity), prSize, black05)
 	}
 
 	for i, msg := range info {
-		st.debugInterface.AddPlacedText(
+		debugInterface.AddPlacedText(
 			Vec2{u.Position.X, u.Position.Y + float64(i)*float64(mainSize+1.0)},
 			msg,
 			Vec2{1.0, 1.0},
@@ -104,11 +98,9 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 	}
 	scale := 0.2
 	greenLine := map[int32]Unit{}
-	for _, u := range st.units {
-		p, ok := st.NearestProj(u)
-		if ok {
-			greenLine[p.Id] = u
-		}
+	p, ok := st.NearestProj(u)
+	if ok {
+		greenLine[p.Id] = u
 	}
 	for _, p := range st.projectiles {
 		color := red025
@@ -118,12 +110,12 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 			color = green
 			d := distantion(uu.Position, p.Position)
 			pv := pointOnCircle(d, p.Position, p2)
-			st.debugInterface.AddRing(p.Position, d, prSize, black)
-			st.debugInterface.AddCircle(pv, bigLineSize, color)
+			debugInterface.AddRing(p.Position, d, prSize, black)
+			debugInterface.AddCircle(pv, bigLineSize, color)
 			vecV1 := rotatePoints(pv, u.Position, 180.0)
-			st.debugInterface.AddCircle(vecV1, lootSize, color)
+			debugInterface.AddCircle(vecV1, lootSize, color)
 		}
-		st.debugInterface.AddSegment(p1, p2, prSize, color)
+		debugInterface.AddSegment(p1, p2, prSize, color)
 	}
 
 	prjs, ok := st.NearestProjs(u)
@@ -131,52 +123,61 @@ func (st *MyStrategy) PrintUnitInfo(u Unit) {
 	if ok {
 
 		for _, p := range prjs {
-			st.debugInterface.AddCircle(p.Position, 2.0*prSize, blue05)
-			v := u.Position.Minus(p.Position).Noramalize().Mult(MaxBU())
-			st.debugInterface.AddSegment(p.Position, p.Position.Plus(v), prSize, blue05)
-			// st.debugInterface.AddSegment(u.Position, u.Position.Minus(v), prSize, blue)
-			st.debugInterface.AddCircle(v, 2.0*prSize, blue05)
+
+			v1 := u.Position.Minus(p.Position)
+			v2 := u.Position.Minus(u.Velocity)
+			vuVec := math.Abs(angle(v1, v2))
+			if vuVec < 45 {
+				debugInterface.AddCircle(p.Position, 2.0*prSize, blue05)
+				v := u.Position.Minus(p.Position).Noramalize().Mult(MaxBU())
+				debugInterface.AddSegment(p.Position, p.Position.Plus(v), prSize, blue05)
+				// st.debugInterface.AddSegment(u.Position, u.Position.Minus(v), prSize, blue)
+				debugInterface.AddCircle(v, 2.0*prSize, blue05)
+			}
 		}
 
 		vecV1 := Vec2{}
 		for _, p := range prjs {
-			v := u.Position.Minus(p.Position).Noramalize()
-			vecV1.X = vecV1.X + v.X
-			vecV1.Y = vecV1.Y + v.Y
+			v1 := u.Position.Minus(p.Position)
+			v2 := u.Position.Minus(u.Velocity)
+			vuVec := math.Abs(angle(v1, v2))
+			if vuVec < 45 {
+				v := u.Position.Minus(p.Position).Noramalize()
+				vecV1.X = vecV1.X + v.X
+				vecV1.Y = vecV1.Y + v.Y
+			}
 		}
-		st.debugInterface.AddSegment(u.Position, vecV1.Noramalize().Mult(MaxBU()), 3.0*prSize, blue)
+		debugInterface.AddSegment(u.Position, u.Position.Plus(vecV1.Mult(MaxBU())), 3.0*prSize, blue)
 	}
 
-	for _, u := range st.units {
-		st.debugInterface.AddSegment(
-			u.Position,
-			u.Position.Plus(u.Velocity),
-			prSize,
-			black,
-		)
-		st.debugInterface.AddSegment(
-			u.Position,
-			u.Position.Plus(u.Direction),
-			lineSize,
-			black25,
-		)
-		// st.debugInterface.AddSegment(
-		// u.Position,
-		// Vec2{u.Position.X + u.Velocity.X, u.Position.Y + u.Velocity.X},
-		// mainSize,
-		// green,
-		// )
-		// st.debugInterface.AddSegment(
-		// u.Position,
-		// u.Velocity,
-		// lineSize,
-		// blue,
-		// )
-		// st.debugInterface.AddSegment(
-		// u.Position,
-		// u.Direction,
-		// lineSize,
-		// green,
-		// )
-	}
+	debugInterface.AddSegment(
+		u.Position,
+		u.Position.Plus(u.Velocity),
+		prSize,
+		black,
+	)
+	debugInterface.AddSegment(
+		u.Position,
+		u.Position.Plus(u.Direction),
+		lineSize,
+		black25,
+	)
+	// st.debugInterface.AddSegment(
+	// u.Position,
+	// Vec2{u.Position.X + u.Velocity.X, u.Position.Y + u.Velocity.X},
+	// mainSize,
+	// green,
+	// )
+	// st.debugInterface.AddSegment(
+	// u.Position,
+	// u.Velocity,
+	// lineSize,
+	// blue,
+	// )
+	// st.debugInterface.AddSegment(
+	// u.Position,
+	// u.Direction,
+	// lineSize,
+	// green,
+	// )
 }

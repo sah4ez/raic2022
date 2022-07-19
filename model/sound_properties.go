@@ -17,6 +17,14 @@ type SoundProperties struct {
 	Offset float64
 }
 
+func (s SoundProperties) IsHit() bool {
+	return s.Name == "WandHit" || s.Name == "BowHit" || s.Name == "StaffHit"
+}
+
+func (s SoundProperties) IsShoot() bool {
+	return s.Name == "Wand" || s.Name == "Bow" || s.Name == "Staff"
+}
+
 func NewSoundProperties(name string, distance float64, offset float64) SoundProperties {
 	return SoundProperties{
 		Name:     name,

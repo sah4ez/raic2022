@@ -140,7 +140,9 @@ func distPointToLine2(p, v Vec2) float64 {
 }
 
 func angle(v1 Vec2, v2 Vec2) float64 {
-	return math.Atan2(v2.Y, v2.X) - math.Atan2(v1.Y, v1.X)
+	dot := v1.X*v2.X + v1.Y*v2.Y
+	det := v1.X*v2.Y - v1.Y*v2.X
+	return math.Atan2(dot, det)
 }
 
 func pointOnCircle(r float64, p1 Vec2, p2 Vec2) Vec2 {

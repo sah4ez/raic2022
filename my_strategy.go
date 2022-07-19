@@ -175,12 +175,9 @@ func (st MyStrategy) getOrder(game Game, debugInterface *DebugInterface) Order {
 	st.allIDs = make(map[int32]struct{})
 	st.lAll.Unlock()
 
-	di = debugInterface
-	st.debugInterface = debugInterface
 	if debugInterface != nil {
 		debugInterface.Clear()
-		di.Clear()
-		di.SetAutoFlush(true)
+		debugInterface.SetAutoFlush(true)
 	}
 	st.game = game
 	st.tick = game.CurrentTick
@@ -199,6 +196,10 @@ func (st MyStrategy) getOrder(game Game, debugInterface *DebugInterface) Order {
 	// st.DoTestAction(debugInterface)
 	st.DoActionUnits()
 	st.PrintLootInfo()
+
+	for _, u := range st.units {
+		st.PrintUnitInfo(debugInterface, u)
+	}
 
 	return Order{
 		UnitOrders: st.GetOrders(),
@@ -363,14 +364,41 @@ func checkProjects(l zerolog.Logger, prjs []Projectile, u Unit, aim Unit) (Vec2,
 	}
 
 	vecV1 := Vec2{}
+	vuVecF := 45.0
 	for _, p := range prjs {
-		v := u.Position.Minus(p.Position).Noramalize()
-		vecV1.X = vecV1.X + v.X
-		vecV1.Y = vecV1.Y + v.Y
+
+		v1 := u.Position.Minus(p.Position)
+		v2 := u.Position.Minus(u.Velocity)
+		vuVec := math.Abs(angle(v1, v2))
+		if vuVecF < vuVec {
+			vuVecF = vuVec
+		}
+		if vuVec < 45 {
+
+			d := distantion(u.Position, p.Position)
+			if p.WeaponTypeIndex == 2 || p.WeaponTypeIndex == 1 {
+				p2 := Vec2{p.Position.X + p.Velocity.X, p.Position.Y + p.Velocity.Y}
+				if d <= UnitRadius()*3.0 {
+					pv := pointOnCircle(d, p.Position, p2)
+					dv := distantion(pv, u.Position)
+					if dist := dv - UnitRadius(); math.Abs(dist) <= 2.0*UnitRadius() {
+						vec := u.Position.Minus(pv).Noramalize().Mult(MaxBU())
+						vecV1.X = vecV1.X + vec.X
+						vecV1.Y = vecV1.Y + vec.Y
+					}
+				}
+				continue
+			}
+			v := u.Position.Minus(p.Position).Noramalize()
+			vecV1.X = vecV1.X + v.X
+			vecV1.Y = vecV1.Y + v.Y
+		}
+
 	}
 	l = l.With().
 		Int("prjs", len(prjs)).
 		Str("vecV1", vecV1.Log()).
+		Float64("vuVec", vuVecF).
 		Int32("aimWI", aim.WeaponIndex()).
 		Logger()
 	return vecV1.Mult(MaxBU()), l
@@ -553,13 +581,13 @@ func (st *MyStrategy) DoActionUnits() {
 func (st *MyStrategy) FailDistance(l zerolog.Logger, u Unit, vecV Vec2, vecD Vec2) bool {
 
 	failDistance := distantion(u.Position, st.game.Zone.CurrentCenter)
-	if failDistance > st.game.Zone.CurrentRadius*0.98 {
+	if fd := st.game.Zone.CurrentRadius - failDistance; math.Abs(fd) < UnitRadius()*2.0 {
 		vecV = st.game.Zone.CurrentCenter.Minus(u.Position)
 		prj, prjOk := st.NearestProj(u)
 		prjPt := prjectilePointPjr(u, prj)
 
 		if prjOk {
-			if u.OnPoint(prjPt, st.URadius()*2) {
+			if u.OnPoint(prjPt, st.URadius()*2.0) {
 				vecV1 := rotatePoints(prjPt, u.Position, 180.0)
 				l = log.With().
 					Str("prj", prj.Position.Log()).
@@ -718,6 +746,7 @@ func (st *MyStrategy) DoActionUnit(u Unit, wg *sync.WaitGroup) {
 
 	aim, aimOk := st.NearestAim(u)
 	ammoD := prop.ProjectileSpeed / prop.ProjectileLifeTime
+	l = l.With().Float64("ammoD", ammoD).Logger()
 	if u.Ammo[u.WeaponIndex()] == 0 {
 		l.Debug().Msg("no ammo... ahhh...!!!!")
 		if st.pickupNoAmmo(l, vecV, vecD, u) {
@@ -757,6 +786,10 @@ func (st *MyStrategy) DoActionUnit(u Unit, wg *sync.WaitGroup) {
 			}
 		}
 
+		o, busy := LineAttackBussy(u, aim)
+		l = l.With().Float64("aim", u.Aim).Bool("busy", busy).Str("o", o.Position.Log()).Logger()
+		isHit := false
+
 		if soundOk && soundD <= soundProp.Distance {
 			l.Debug().Str("soudnName", soundProp.Name).Msg("under fire sound")
 			if soundProp.Name == "BowHit" {
@@ -767,13 +800,18 @@ func (st *MyStrategy) DoActionUnit(u Unit, wg *sync.WaitGroup) {
 				vecV1 = vecV1.Mult(MaxBU())
 				vecV = u.Position.Plus(vecV1)
 			}
+			isHit = busy && soundProp.IsHit()
 		}
-		o, busy := LineAttackBussy(u, aim)
-		l = l.With().Float64("aim", u.Aim).Bool("busy", busy).Str("o", o.Position.Log()).Logger()
 
 		act := NewActionOrderAim(!busy)
 		action = &act
 		if busy {
+
+			if isHit {
+				vecD = sound.Position.Minus(u.Position).Noramalize().Mult(MaxBU())
+				st.MoveUnit(l, "soundRotateMoveAttack", u, st.NewUnitOrder(u, vecV, vecD, &action))
+				return
+			}
 			if !u.IsArcher() {
 				if st.pickupWeapon(l, vecV, vecD, u) {
 					return
@@ -794,7 +832,7 @@ func (st *MyStrategy) DoActionUnit(u Unit, wg *sync.WaitGroup) {
 		vecD = aim.Position.Minus(u.Position)
 
 		loot, ok := st.NearestLootSheild(u)
-		if ok && u.OnPoint(loot.Position, st.URadius()) {
+		if ok && u.OnPoint(loot.Position, st.URadius()*2.0) {
 			act := NewActionOrderPickup(loot.Id)
 			action = &act
 			st.MoveUnit(l, "moveAttackPickupLoot", u, st.NewUnitOrder(u, vecV, vecD, &action))
@@ -823,14 +861,15 @@ func (st *MyStrategy) DoActionUnit(u Unit, wg *sync.WaitGroup) {
 				st.MoveUnit(l, "soundMoveAttackToAim", u, st.NewUnitOrder(u, vecV, vecD, nil))
 				return
 			}
+
 		}
 
 		if d := u.Position.Distance(aim.Position); d < ammoD { // можем стрелять и есть цель
 			// 90% от дистанции выстрела и не под прицелом
-			if d <= 2.0*st.URadius() && !prjOk {
+			if d <= ammoD/2.0 && !prjOk {
 				// vecV = vecV.Mult(-1.0)
 				// пытаемся сместиться в случае отступления к центру карты
-				vecV = aim.Position.Minus(u.Position)
+				vecV = u.Position.Minus(aim.Position)
 			} else if st.pickupWeapon(l, vecV, vecD, u) {
 				return
 			} else if st.pickupAmmo(l, vecV, vecD, u) {
@@ -883,7 +922,6 @@ func (st *MyStrategy) PrintLootInfo() {
 }
 
 func (st *MyStrategy) MoveUnit(l zerolog.Logger, msg string, u Unit, o UnitOrder) {
-	st.PrintUnitInfo(u)
 	st.l.Lock()
 	defer st.l.Unlock()
 
