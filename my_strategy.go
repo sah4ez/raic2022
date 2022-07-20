@@ -308,6 +308,32 @@ func (st *MyStrategy) MaxUVel() float64 {
 	return st.consts.MaxUnitForwardSpeed
 }
 
+func commonSegemt(unit Unit, aim Unit, o Obstacle) bool {
+	x1 := unit.Position.X - o.Position.X
+	y1 := unit.Position.Y - o.Position.Y
+	x2 := aim.Position.X - o.Position.X
+	y2 := aim.Position.Y - o.Position.Y
+	dx := x2 - x1
+	dy := y2 - y1
+	R := o.Radius
+
+	//составляем коэффициенты квадратного уравнения на пересечение прямой и окружности.
+	//если на отрезке [0..1] есть отрицательные значения, значит отрезок пересекает окружность
+	a := dx*dx + dy*dy
+	b := 2. * (x1*dx + y1*dy)
+	c := x1*x1 + y1*y1 - R*R
+
+	//а теперь проверяем, есть ли на отрезке [0..1] решения
+	if -b < 0 {
+		return (c < 0)
+	}
+	if -b < (2 * a) {
+		return ((4*a*c - b*b) < 0)
+	}
+
+	return (a+b+c < 0)
+}
+
 func LineAttackBussy(u Unit, aim Unit) (o Obstacle, free bool) {
 	if _, ok := NearestObstacle(u); !ok {
 		return Obstacle{}, false
@@ -317,7 +343,6 @@ func LineAttackBussy(u Unit, aim Unit) (o Obstacle, free bool) {
 	copy(obs, consts.Obstacles)
 
 	sort.Sort(NewByDistanceObstacle(u, obs))
-	d := distantion(aim.Position, u.Position)
 	for _, o := range obs {
 		if d := distantion(o.Position, u.Position); d > consts.ViewDistance {
 			break
@@ -325,10 +350,7 @@ func LineAttackBussy(u Unit, aim Unit) (o Obstacle, free bool) {
 		if o.CanShootThrough {
 			continue
 		}
-		dAO := distantion(aim.Position, o.Position)
-		dUO := distantion(u.Position, o.Position)
-		if dAO+dUO < d+o.Radius {
-			// fmt.Println("o>", o.Position, dAO, dUO, o.Radius, d)
+		if commonSegemt(u, aim, o) {
 			return o, true
 		}
 	}
@@ -358,57 +380,45 @@ func checkProject(l zerolog.Logger, prjPt Vec2, u Unit, aim Unit) (Vec2, zerolog
 	return Vec2{}, l
 }
 
-func checkProjects(l zerolog.Logger, prjs []Projectile, u Unit, aim Unit) (Vec2, zerolog.Logger) {
+func checkProjects(l zerolog.Logger, prjs []Projectile, u Unit) (Vec2, zerolog.Logger) {
 	if len(prjs) == 0 {
 		return Vec2{}, l
 	}
 
 	vecV1 := Vec2{}
-	vuVecF := 45.0
+
 	for _, p := range prjs {
 
-		v1 := u.Position.Minus(p.Position)
-		v2 := u.Position.Minus(u.Velocity)
-		vuVec := math.Abs(angle(v1, v2))
-		if vuVecF < vuVec {
-			vuVecF = vuVec
+		d := distantion(u.Position, p.Position)
+		if p.WeaponTypeIndex == 2 || p.WeaponTypeIndex == 1 {
+			p2 := Vec2{p.Position.X + p.Velocity.X*300.0, p.Position.Y + p.Velocity.Y*300.0}
+			pv := pointOnCircle(d, p.Position, p2)
+			// dv := distantion(pv, u.Position)
+			// if dist := dv - UnitRadius(); math.Abs(dist) <= 2.0*UnitRadius() {
+			vec := u.Position.Plus(pv).Noramalize()
+			vecV1.X = vecV1.X + vec.X
+			vecV1.Y = vecV1.Y + vec.Y
+			// }
+			continue
 		}
-		if vuVec < 45 {
-
-			d := distantion(u.Position, p.Position)
-			if p.WeaponTypeIndex == 2 || p.WeaponTypeIndex == 1 {
-				p2 := Vec2{p.Position.X + p.Velocity.X, p.Position.Y + p.Velocity.Y}
-				if d <= UnitRadius()*3.0 {
-					pv := pointOnCircle(d, p.Position, p2)
-					dv := distantion(pv, u.Position)
-					if dist := dv - UnitRadius(); math.Abs(dist) <= 2.0*UnitRadius() {
-						vec := u.Position.Minus(pv).Noramalize().Mult(MaxBU())
-						vecV1.X = vecV1.X + vec.X
-						vecV1.Y = vecV1.Y + vec.Y
-					}
-				}
-				continue
-			}
-			v := u.Position.Minus(p.Position).Noramalize()
-			vecV1.X = vecV1.X + v.X
-			vecV1.Y = vecV1.Y + v.Y
-		}
+		v := u.Position.Plus(p.Position).Noramalize()
+		vecV1.X = vecV1.X + v.X
+		vecV1.Y = vecV1.Y + v.Y
 
 	}
 	l = l.With().
 		Int("prjs", len(prjs)).
 		Str("vecV1", vecV1.Log()).
-		Float64("vuVec", vuVecF).
-		Int32("aimWI", aim.WeaponIndex()).
 		Logger()
 	return vecV1.Mult(MaxBU()), l
 }
 
-func (st *MyStrategy) pickupWeapon(l zerolog.Logger, vecV Vec2, vecD Vec2, u Unit) bool {
+func (st *MyStrategy) pickupWeapon(l zerolog.Logger, prjs []Projectile, vecV Vec2, vecD Vec2, u Unit) bool {
 	var action ActionOrder
 	if u.IsArcher() {
 		return false
 	}
+
 	loot, ok := st.NearestLootWeapon(u)
 	if ok {
 		if u.Weapon != nil {
@@ -427,6 +437,11 @@ func (st *MyStrategy) pickupWeapon(l zerolog.Logger, vecV Vec2, vecD Vec2, u Uni
 		vecV1 = vecV1.Noramalize()
 		vecV = vecV1.Mult(MaxFU())
 
+		prjV, ll := checkProjects(l, prjs, u)
+		if !prjV.IsZero() {
+			vecV = u.Position.Plus(prjV)
+		}
+		l = ll
 		if ok && u.OnPoint(loot.Position, st.URadius()) {
 			act := NewActionOrderPickup(loot.Id)
 			action = &act
@@ -708,7 +723,7 @@ func (st *MyStrategy) DoActionUnit(u Unit, wg *sync.WaitGroup) {
 		return
 	}
 	if u.Weapon == nil {
-		if st.pickupWeapon(l, vecV, vecD, u) {
+		if st.pickupWeapon(l, []Projectile{}, vecV, vecD, u) {
 			return
 		}
 	}
@@ -779,11 +794,11 @@ func (st *MyStrategy) DoActionUnit(u Unit, wg *sync.WaitGroup) {
 		// }
 		// }
 		if prjOk {
-			prjV, ll := checkProjects(l, prjs, u, aim)
+			prjV, ll := checkProjects(l, prjs, u)
 			if !prjV.IsZero() {
-				vecV = prjV
-				l = ll
+				vecV = u.Position.Plus(prjV)
 			}
+			l = ll
 		}
 
 		o, busy := LineAttackBussy(u, aim)
@@ -813,12 +828,17 @@ func (st *MyStrategy) DoActionUnit(u Unit, wg *sync.WaitGroup) {
 				return
 			}
 			if !u.IsArcher() {
-				if st.pickupWeapon(l, vecV, vecD, u) {
+				if st.pickupWeapon(l, prjs, vecV, vecD, u) {
 					return
 				} else if st.pickupAmmo(l, vecV, vecD, u) {
 					return
 				}
 			}
+		}
+		if isHit && u.Aim == 0 && !busy {
+			vecD = sound.Position.Minus(u.Position).Noramalize().Mult(MaxBU())
+			st.MoveUnit(l, "soundRotateMoveAttack", u, st.NewUnitOrder(u, vecV, vecD, &action))
+			return
 		}
 		if u.IsArcher() {
 			vecD = vecD.Plus(aim.Velocity.Noramalize().Mult(st.URadius()))
@@ -846,11 +866,11 @@ func (st *MyStrategy) DoActionUnit(u Unit, wg *sync.WaitGroup) {
 		// }
 		// }
 		if prjOk {
-			prjV, ll := checkProjects(l, prjs, u, aim)
+			prjV, ll := checkProjects(l, prjs, u)
 			if !prjV.IsZero() {
-				vecV = prjV
-				l = ll
+				vecV = u.Position.Plus(prjV)
 			}
+			l = ll
 		} else if soundOk && soundD <= soundProp.Distance {
 			l.Debug().Str("soudnName", soundProp.Name).Msg("under fire sound")
 			if soundProp.Name == "BowHit" {
@@ -870,7 +890,7 @@ func (st *MyStrategy) DoActionUnit(u Unit, wg *sync.WaitGroup) {
 				// vecV = vecV.Mult(-1.0)
 				// пытаемся сместиться в случае отступления к центру карты
 				vecV = u.Position.Minus(aim.Position)
-			} else if st.pickupWeapon(l, vecV, vecD, u) {
+			} else if st.pickupWeapon(l, prjs, vecV, vecD, u) {
 				return
 			} else if st.pickupAmmo(l, vecV, vecD, u) {
 				return
@@ -879,7 +899,7 @@ func (st *MyStrategy) DoActionUnit(u Unit, wg *sync.WaitGroup) {
 		st.MoveUnit(l, "moveAttackToAim", u, st.NewUnitOrder(u, vecV, vecD, nil))
 		return
 	}
-	if st.pickupWeapon(l, vecV, vecD, u) {
+	if st.pickupWeapon(l, prjs, vecV, vecD, u) {
 		return
 	}
 	if st.pickupWalkingAmmo(l, vecV, vecD, u) {

@@ -3,7 +3,8 @@ package main
 import (
 	. "ai_cup_22/model"
 	"fmt"
-	"math"
+
+	"github.com/rs/zerolog/log"
 )
 
 func (st *MyStrategy) PrintUnitInfo(debugInterface *DebugInterface, u Unit) {
@@ -87,15 +88,6 @@ func (st *MyStrategy) PrintUnitInfo(debugInterface *DebugInterface, u Unit) {
 		debugInterface.AddSegment(u.Position, u.Position.Plus(u.Velocity), prSize, black05)
 	}
 
-	for i, msg := range info {
-		debugInterface.AddPlacedText(
-			Vec2{u.Position.X, u.Position.Y + float64(i)*float64(mainSize+1.0)},
-			msg,
-			Vec2{1.0, 1.0},
-			mainSize,
-			black,
-		)
-	}
 	scale := 0.2
 	greenLine := map[int32]Unit{}
 	p, ok := st.NearestProj(u)
@@ -122,32 +114,37 @@ func (st *MyStrategy) PrintUnitInfo(debugInterface *DebugInterface, u Unit) {
 
 	if ok {
 
+		info = append(info, fmt.Sprintf("%d under prj: %d", u.Id, len(prjs)))
 		for _, p := range prjs {
 
-			v1 := u.Position.Minus(p.Position)
-			v2 := u.Position.Minus(u.Velocity)
-			vuVec := math.Abs(angle(v1, v2))
-			if vuVec < 45 {
-				debugInterface.AddCircle(p.Position, 2.0*prSize, blue05)
-				v := u.Position.Minus(p.Position).Noramalize().Mult(MaxBU())
-				debugInterface.AddSegment(p.Position, p.Position.Plus(v), prSize, blue05)
-				// st.debugInterface.AddSegment(u.Position, u.Position.Minus(v), prSize, blue)
-				debugInterface.AddCircle(v, 2.0*prSize, blue05)
+			// v1 := u.Position.Minus(p.Position)
+			// v2 := u.Position.Minus(u.Velocity)
+			// vuVec := math.Abs(angle(v1, v2))
+			// if vuVec < 45 {
+			debugInterface.AddCircle(p.Position, 2.0*prSize, blue05)
+			v := u.Position.Minus(p.Position).Noramalize().Mult(MaxBU())
+			debugInterface.AddSegment(p.Position, p.Position.Plus(v), prSize, blue05)
+			// st.debugInterface.AddSegment(u.Position, u.Position.Minus(v), prSize, blue)
+			debugInterface.AddCircle(v, 2.0*prSize, blue05)
+			// }
+			d := distantion(u.Position, p.Position)
+			if p.WeaponTypeIndex == 2 || p.WeaponTypeIndex == 1 {
+				vecV1 := Vec2{}
+				p2 := Vec2{p.Position.X + p.Velocity.X*300.0, p.Position.Y + p.Velocity.Y*300.0}
+				pv := pointOnCircle(d, p.Position, p2)
+				// dv := distantion(pv, u.Position)
+				// if dist := dv - UnitRadius(); math.Abs(dist) <= 2.0*UnitRadius() {
+				vec := u.Position.Plus(pv).Noramalize()
+				vecV1.X = vecV1.X + vec.X
+				vecV1.Y = vecV1.Y + vec.Y
+				// }
+				debugInterface.AddSegment(u.Position, u.Position.Plus(vecV1.Mult(MaxBU())), 0.5*prSize, black)
+				continue
 			}
 		}
 
-		vecV1 := Vec2{}
-		for _, p := range prjs {
-			v1 := u.Position.Minus(p.Position)
-			v2 := u.Position.Minus(u.Velocity)
-			vuVec := math.Abs(angle(v1, v2))
-			if vuVec < 45 {
-				v := u.Position.Minus(p.Position).Noramalize()
-				vecV1.X = vecV1.X + v.X
-				vecV1.Y = vecV1.Y + v.Y
-			}
-		}
-		debugInterface.AddSegment(u.Position, u.Position.Plus(vecV1.Mult(MaxBU())), 3.0*prSize, blue)
+		vecV1, _ := checkProjects(log.Logger, prjs, u)
+		debugInterface.AddSegment(u.Position, u.Position.Plus(vecV1.Mult(MaxBU())), 0.5*prSize, blue)
 	}
 
 	debugInterface.AddSegment(
@@ -162,22 +159,13 @@ func (st *MyStrategy) PrintUnitInfo(debugInterface *DebugInterface, u Unit) {
 		lineSize,
 		black25,
 	)
-	// st.debugInterface.AddSegment(
-	// u.Position,
-	// Vec2{u.Position.X + u.Velocity.X, u.Position.Y + u.Velocity.X},
-	// mainSize,
-	// green,
-	// )
-	// st.debugInterface.AddSegment(
-	// u.Position,
-	// u.Velocity,
-	// lineSize,
-	// blue,
-	// )
-	// st.debugInterface.AddSegment(
-	// u.Position,
-	// u.Direction,
-	// lineSize,
-	// green,
-	// )
+	for i, msg := range info {
+		debugInterface.AddPlacedText(
+			Vec2{u.Position.X, u.Position.Y + float64(i)*float64(mainSize+1.0)},
+			msg,
+			Vec2{1.0, 1.0},
+			mainSize,
+			black,
+		)
+	}
 }

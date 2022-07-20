@@ -74,8 +74,8 @@ func (v Vec2) Scalar(f Vec2) Vec2 {
 
 func (v Vec2) Log() string {
 	return "[" +
-		fmt.Sprintf("%.f", v.X) + ":" +
-		fmt.Sprintf("%.f", v.Y) +
+		fmt.Sprintf("%f", v.X) + ":" +
+		fmt.Sprintf("%f", v.Y) +
 		"]"
 }
 

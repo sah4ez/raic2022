@@ -80,31 +80,48 @@ func (st *MyStrategy) NearestProj(u Unit) (Projectile, bool) {
 	return Projectile{}, false
 }
 
+func commonSegemtPrj(prj Projectile, o Unit) bool {
+
+	p1 := Vec2{prj.Position.X - prj.Velocity.X*300, prj.Position.Y - prj.Velocity.Y*300}
+	p2 := Vec2{prj.Position.X + prj.Velocity.X, prj.Position.Y + prj.Velocity.Y}
+
+	x1 := p1.X - o.Position.X
+	y1 := p1.Y - o.Position.Y
+	x2 := p2.X - o.Position.X
+	y2 := p2.Y - o.Position.Y
+	dx := x2 - x1
+	dy := y2 - y1
+	R := UnitRadius() * 2.0
+
+	//составляем коэффициенты квадратного уравнения на пересечение прямой и окружности.
+	//если на отрезке [0..1] есть отрицательные значения, значит отрезок пересекает окружность
+	a := dx*dx + dy*dy
+	b := 2. * (x1*dx + y1*dy)
+	c := x1*x1 + y1*y1 - R*R
+
+	//а теперь проверяем, есть ли на отрезке [0..1] решения
+	if -b < 0 {
+		return (c < 0)
+	}
+	if -b < (2 * a) {
+		return ((4*a*c - b*b) < 0)
+	}
+
+	return (a+b+c < 0)
+}
+
 func (st *MyStrategy) NearestProjs(u Unit) ([]Projectile, bool) {
+	result := []Projectile{}
 	if len(st.projectiles) > 0 {
-		result := make([]Projectile, 0)
 		sort.Sort(NewByDistanceProjectiles(u, st.projectiles))
 
 		for _, p := range st.projectiles {
-			// if shooter, ok := st.hAims[p.ShooterId]; ok {
-			// distToProject := distantion(shooter.Position, p.Position)
-			// prjOk := shooter.OnPoint(u.Position, distToProject-st.URadius())
-			//
-			// if ok := u.OnPoint(p.Position, 0.8*ViewDU()); ok && !prjOk {
-			// result = append(result, p)
-			// }
-			// } else {
-			if ok := u.OnPoint(p.Position, 0.8*ViewDU()); ok {
+			if commonSegemtPrj(p, u) {
 				result = append(result, p)
 			}
-			// }
 		}
-		if len(result) == 0 {
-			return nil, false
-		}
-		return result, true
 	}
-	return nil, false
+	return result, len(result) > 0
 }
 
 func NearestObstacle(u Unit) (Obstacle, bool) {
