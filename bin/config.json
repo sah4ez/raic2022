@@ -1,12 +1,12 @@
 {
   "seed": null,
   "game": {
-    "Create": "Round1"
+    "Create": "Round2"
   },
   "players": [
     {
       "Tcp": {
-        "port": 31002,
+        "port": 31001,
         "timeout": 1,
         "accept_timeout": 10,
         "run": {
@@ -14,7 +14,7 @@
           "run_command": [
             "raic2022_new",
             "localhost",
-            "31002"
+            "31001"
           ]
         }
       }

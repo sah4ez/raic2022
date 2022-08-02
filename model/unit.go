@@ -56,6 +56,18 @@ func (u Unit) WeaponIndex() int32 {
 	return *u.Weapon
 }
 
+func (u Unit) IsArcher() bool {
+	return u.WeaponIndex() == 2
+}
+
+func (u Unit) IsStaffer() bool {
+	return u.WeaponIndex() == 1
+}
+
+func (u Unit) CanShoot(tick int32) bool {
+	return u.NextShotTick == 0 || u.NextShotTick <= tick
+}
+
 func NewUnit(id int32, playerId int32, health float64, shield float64, extraLives int32, position Vec2, remainingSpawnTime *float64, velocity Vec2, direction Vec2, aim float64, action *Action, healthRegenerationStartTick int32, weapon *int32, nextShotTick int32, ammo []int32, shieldPotions int32) Unit {
 	return Unit{
 		Id:                          id,
